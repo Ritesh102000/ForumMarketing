@@ -139,6 +139,18 @@ def test_responses_survive_a_form_edit():
     assert rows[0]["payload"][qid] == "@someone"
 
 
+def test_linking_a_sheet_queues_every_existing_response_for_backfill():
+    form_id = repository.create_form(FormIn.model_validate(sample_form()))
+    response_id = repository.save_response(form_id, {})
+    repository.mark_synced(response_id)
+
+    repository.set_sheet(form_id, "sheet-123", "https://docs.google.com/sheet-123")
+
+    rows = repository.list_responses(form_id)
+    assert rows[0]["synced"] is False
+    assert repository.pending_sync(form_id=form_id)[0]["id"] == response_id
+
+
 def test_delete_cascades():
     form_id = repository.create_form(FormIn.model_validate(sample_form()))
     repository.save_response(form_id, {})
@@ -207,6 +219,64 @@ def test_full_submission_flow(admin_client):
     assert len(rows) == 1
     assert rows[0]["payload"][qids[2]] == ["IG", "YouTube"]
     assert rows[0]["payload"][qids[3]] == 4
+    # No spreadsheet is linked yet. "Synced" must not claim that there was
+    # nothing to do: linking one later should backfill this response.
+    assert rows[0]["synced"] is False
+
+
+def test_direct_sheet_sync_creates_appends_and_updates_headers(
+    monkeypatch, admin_client
+):
+    from formcraft import sheets
+
+    patch_settings(monkeypatch, google_enabled=True)
+    calls: list[tuple] = []
+
+    monkeypatch.setattr(
+        sheets,
+        "create_spreadsheet",
+        lambda form: ("sheet-123", "https://docs.google.com/sheet-123"),
+    )
+    monkeypatch.setattr(
+        sheets,
+        "append_response",
+        lambda form, response_id, answers, submitted_at=None: calls.append(
+            ("append", form["id"], response_id, answers)
+        ),
+    )
+    monkeypatch.setattr(
+        sheets,
+        "sync_spreadsheet",
+        lambda form: calls.append(("update", form["id"], form["title"])),
+    )
+
+    created = admin_client.post("/api/forms", json=sample_form())
+    assert created.status_code == 201
+    form_id = created.json()["id"]
+    form = repository.get_form(form_id=form_id)
+    assert form["sheet_id"] == "sheet-123"
+
+    qids = [q["id"] for q in form["questions"]]
+    submitted = admin_client.post(
+        f"/f/{form['public_ref']}",
+        json={qids[0]: "@direct", qids[1]: "direct@example.com"},
+    )
+    assert submitted.status_code == 200
+    response = repository.list_responses(form_id)[0]
+    assert response["synced"] is True
+    assert ("append", form_id, response["id"], response["payload"]) in calls
+
+    renamed = sample_form(title="Renamed intake")
+    renamed["sections"][0]["questions"] = [
+        {**question, "id": qid}
+        for question, qid in zip(
+            renamed["sections"][0]["questions"], qids, strict=True
+        )
+    ]
+    updated = admin_client.put(f"/api/forms/{form_id}", json=renamed)
+    assert updated.status_code == 200
+    assert updated.json()["sheet"]["updated"] is True
+    assert ("update", form_id, "Renamed intake") in calls
 
 
 def test_draft_is_hidden_from_the_public(admin_client):

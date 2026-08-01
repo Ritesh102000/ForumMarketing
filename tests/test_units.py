@@ -6,7 +6,7 @@ import pytest
 
 from formcraft.models import FormIn, validate_answer
 from formcraft.repository import slugify
-from formcraft.sheets import _column_letter
+from formcraft.sheets import RESPONSE_ID_KEY, _column_letter
 
 
 @pytest.mark.parametrize(
@@ -48,6 +48,10 @@ def test_column_letter():
     assert _column_letter(26) == "AA"
     assert _column_letter(51) == "AZ"
     assert _column_letter(701) == "ZZ"
+
+
+def test_response_id_mapping_key_cannot_collide_with_question_ids():
+    assert RESPONSE_ID_KEY.startswith("__formcraft_")
 
 
 @pytest.mark.parametrize(

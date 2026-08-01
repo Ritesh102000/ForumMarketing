@@ -269,7 +269,7 @@ def _register_admin(app: FastAPI) -> None:  # noqa: C901 - route table, flat by 
             repository.update_form(form_id, payload)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Form not found") from exc
-        return JSONResponse({"id": form_id})
+        return JSONResponse({"id": form_id, "sheet": _sync_sheet(form_id)})
 
     @app.delete("/api/forms/{form_id}", dependencies=[local, admin])
     def api_delete(form_id: str) -> JSONResponse:
@@ -328,14 +328,15 @@ def _register_public(app: FastAPI) -> None:
 
         response_id = repository.save_response(form["id"], answers)
 
-        sync_error = ""
         if sheets.enabled() and form.get("sheet_id"):
             try:
-                sheets.append_response(form, answers)
+                sheets.append_response(form, response_id, answers)
             except Exception as exc:  # noqa: BLE001 - never lose a response
                 sync_error = f"{type(exc).__name__}: {exc}"
                 log.warning("sheet sync failed for %s: %s", response_id, sync_error)
-        repository.mark_synced(response_id, sync_error)
+                repository.mark_synced(response_id, sync_error)
+            else:
+                repository.mark_synced(response_id)
 
         return JSONResponse({"ok": True, "message": form["confirm_msg"]})
 
@@ -406,6 +407,8 @@ def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
     if form.get("sheet_id") and not force:
         return {"created": False, "url": form["sheet_url"], "detail": "Already linked."}
 
+    form["sheet_questions"] = repository.all_questions(form_id)
+
     try:
         sheet_id, sheet_url = sheets.create_spreadsheet(form)
     except Exception as exc:  # noqa: BLE001
@@ -415,23 +418,56 @@ def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
         return {"created": False, "detail": detail}
 
     repository.set_sheet(form_id, sheet_id, sheet_url)
-    return {"created": True, "url": sheet_url, "detail": "Spreadsheet created."}
+    backfill = retry_pending(form_id=form_id)
+    return {
+        "created": True,
+        "url": sheet_url,
+        "backfilled": backfill["synced"],
+        "detail": "Spreadsheet created and existing responses synchronized.",
+    }
 
 
-def retry_pending() -> dict[str, Any]:
+def _sync_sheet(form_id: str) -> dict[str, Any]:
+    """Keep a linked spreadsheet aligned with a saved form without blocking saves."""
+    if not sheets.enabled():
+        return {"updated": False, "detail": "Google sync is off."}
+
+    form = repository.get_form(form_id=form_id)
+    if form is None:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if not form.get("sheet_id"):
+        return {"updated": False, "detail": "No spreadsheet is linked."}
+
+    form["sheet_questions"] = repository.all_questions(form_id)
+    try:
+        sheets.sync_spreadsheet(form)
+    except Exception as exc:  # noqa: BLE001 - the form edit is already durable
+        detail = f"{type(exc).__name__}: {exc}"
+        repository.set_sheet_error(form_id, detail)
+        log.warning("sheet update failed for %s: %s", form_id, detail)
+        return {"updated": False, "detail": detail}
+
+    repository.set_sheet_error(form_id)
+    return {"updated": True, "url": form["sheet_url"], "detail": "Sheet updated."}
+
+
+def retry_pending(form_id: str = "") -> dict[str, Any]:
     """Push any responses that failed to reach their spreadsheet."""
     if not sheets.enabled():
         return {"attempted": 0, "synced": 0, "detail": "Google sync is off."}
 
-    pending = repository.pending_sync()
+    pending = repository.pending_sync(form_id=form_id)
     synced = 0
     last_error = ""
     for item in pending:
         form = repository.get_form(form_id=item["form_id"])
         if form is None:
             continue
+        form["sheet_questions"] = repository.all_questions(item["form_id"])
         try:
-            sheets.append_response(form, item["payload"], item["submitted_at"])
+            sheets.append_response(
+                form, item["id"], item["payload"], item["submitted_at"]
+            )
         except Exception as exc:  # noqa: BLE001
             last_error = f"{type(exc).__name__}: {exc}"
             repository.mark_synced(item["id"], last_error)

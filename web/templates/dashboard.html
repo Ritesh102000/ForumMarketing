@@ -36,14 +36,19 @@
   </article>
 </section>
 
-{% if google.enabled %}
 <div class="status-bar {{ 'is-ok' if google.ready else 'is-warn' }}">
   <span class="dot"></span>
   <strong>Google Sheets</strong>
-  <span class="muted">{{ google.detail }}</span>
+  <span class="muted">
+    {% if google.enabled %}{{ google.detail }}
+    {% else %}Not connected. Responses remain safely stored for later backfill.{% endif %}
+  </span>
+  {% if google.enabled %}
   <button class="btn btn-sm btn-ghost push" id="retry-sync">Retry pending</button>
+  {% else %}
+  <span class="pill pill-draft push"><span class="dot"></span>Setup required</span>
+  {% endif %}
 </div>
-{% endif %}
 
 {% if not forms %}
 <div class="card empty">
@@ -86,6 +91,7 @@
       <div class="card-actions">
         <a class="btn btn-sm" href="/admin/{{ f.id }}">Edit</a>
         <a class="btn btn-sm" href="/admin/{{ f.id }}/responses">Responses</a>
+        {% if f.sheet_url %}<a class="btn btn-sm btn-ghost" href="{{ f.sheet_url }}" target="_blank" rel="noopener">Google Sheet ↗</a>{% endif %}
         <a class="btn btn-sm btn-ghost" href="/f/{{ f.public_ref }}" target="_blank" rel="noopener">Open link ↗</a>
         {% if f.response_count %}<a class="btn btn-sm btn-ghost" href="/admin/{{ f.id }}/export.xlsx">Excel</a>{% endif %}
       </div>

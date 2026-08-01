@@ -279,7 +279,14 @@ els.save.addEventListener('click', async () => {
     return;
   }
   els.save.disabled = false;
-  els.state.textContent = 'Saved';
+  if (data.sheet?.updated) {
+    els.state.textContent = 'Saved · Sheet updated';
+  } else if (data.sheet && data.sheet.detail !== 'No spreadsheet is linked.' && data.sheet.detail !== 'Google sync is off.') {
+    els.state.textContent = 'Saved · Sheet pending';
+    console.warn('Google Sheet update:', data.sheet.detail);
+  } else {
+    els.state.textContent = 'Saved';
+  }
   els.state.classList.remove('is-dirty');
 });
 

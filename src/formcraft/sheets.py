@@ -26,6 +26,8 @@ from .db import readonly, transaction
 SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 TIMESTAMP_HEADER = "Submitted at"
+RESPONSE_ID_HEADER = "Formcraft response ID"
+RESPONSE_ID_KEY = "__formcraft_response_id__"
 
 _lock = threading.Lock()
 _service: Any = None
@@ -117,7 +119,7 @@ def create_spreadsheet(form: dict[str, Any]) -> tuple[str, str]:
         return "", ""
 
     service = _load_service()
-    questions = [q for q in form["questions"] if not q["archived"]]
+    questions = form.get("sheet_questions", form["questions"])
 
     created = (
         service.spreadsheets()
@@ -133,8 +135,11 @@ def create_spreadsheet(form: dict[str, Any]) -> tuple[str, str]:
     sheet_id = created["spreadsheetId"]
     sheet_url = created["spreadsheetUrl"]
 
-    header = [TIMESTAMP_HEADER] + [q["label"] for q in questions]
+    header = [TIMESTAMP_HEADER] + [_header_label(q) for q in questions]
     mapping = {q["id"]: index + 1 for index, q in enumerate(questions)}
+    response_id_index = len(header)
+    mapping[RESPONSE_ID_KEY] = response_id_index
+    header.append(RESPONSE_ID_HEADER)
 
     service.spreadsheets().values().update(
         spreadsheetId=sheet_id,
@@ -143,12 +148,12 @@ def create_spreadsheet(form: dict[str, Any]) -> tuple[str, str]:
         body={"values": [header]},
     ).execute()
 
-    _freeze_header(service, sheet_id)
+    _format_sheet(service, sheet_id, response_id_index)
     _write_columns(form["id"], mapping)
     return sheet_id, sheet_url
 
 
-def _freeze_header(service: Any, sheet_id: str) -> None:
+def _format_sheet(service: Any, sheet_id: str, response_id_index: int) -> None:
     # Cosmetic only — never let this block sheet creation.
     with contextlib.suppress(Exception):
         service.spreadsheets().batchUpdate(
@@ -175,9 +180,66 @@ def _freeze_header(service: Any, sheet_id: str) -> None:
                             "fields": "userEnteredFormat.textFormat.bold",
                         }
                     },
+                    {
+                        "updateDimensionProperties": {
+                            "range": {
+                                "sheetId": 0,
+                                "dimension": "COLUMNS",
+                                "startIndex": response_id_index,
+                                "endIndex": response_id_index + 1,
+                            },
+                            "properties": {"hiddenByUser": True},
+                            "fields": "hiddenByUser",
+                        }
+                    },
                 ]
             },
         ).execute()
+
+
+def _header_label(question: dict[str, Any]) -> str:
+    suffix = " (removed)" if question.get("archived") else ""
+    return f"{question['label']}{suffix}"
+
+
+def _ensure_response_id_column(
+    service: Any, form: dict[str, Any], mapping: dict[str, int]
+) -> dict[str, int]:
+    """Add the private idempotency column to spreadsheets from older releases."""
+    if RESPONSE_ID_KEY in mapping:
+        return mapping
+
+    index = max(mapping.values(), default=0) + 1
+    service.spreadsheets().values().update(
+        spreadsheetId=form["sheet_id"],
+        range=f"Responses!{_column_letter(index)}1",
+        valueInputOption="RAW",
+        body={"values": [[RESPONSE_ID_HEADER]]},
+    ).execute()
+    mapping[RESPONSE_ID_KEY] = index
+    _write_columns(form["id"], {RESPONSE_ID_KEY: index})
+
+    with contextlib.suppress(Exception):
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=form["sheet_id"],
+            body={
+                "requests": [
+                    {
+                        "updateDimensionProperties": {
+                            "range": {
+                                "sheetId": 0,
+                                "dimension": "COLUMNS",
+                                "startIndex": index,
+                                "endIndex": index + 1,
+                            },
+                            "properties": {"hiddenByUser": True},
+                            "fields": "hiddenByUser",
+                        }
+                    }
+                ]
+            },
+        ).execute()
+    return mapping
 
 
 def _ensure_columns(
@@ -185,6 +247,7 @@ def _ensure_columns(
 ) -> dict[str, int]:
     """Assign columns to any question added after the sheet was created."""
     mapping = _read_columns(form["id"])
+    mapping = _ensure_response_id_column(service, form, mapping)
     missing = [q for q in questions if q["id"] not in mapping]
     if not missing:
         return mapping
@@ -194,7 +257,7 @@ def _ensure_columns(
     header_cells: list[str] = []
     for question in missing:
         additions[question["id"]] = next_index
-        header_cells.append(question["label"])
+        header_cells.append(_header_label(question))
         next_index += 1
 
     start = _column_letter(min(additions.values()))
@@ -211,6 +274,51 @@ def _ensure_columns(
     return mapping
 
 
+def sync_spreadsheet(form: dict[str, Any]) -> None:
+    """Synchronize a form title and question headers after an admin edit."""
+    if not enabled() or not form.get("sheet_id"):
+        return
+
+    service = _load_service()
+    questions = form.get("sheet_questions", form["questions"])
+    mapping = _ensure_columns(service, form, questions)
+
+    data = [
+        {
+            "range": "Responses!A1",
+            "values": [[TIMESTAMP_HEADER]],
+        },
+        {
+            "range": f"Responses!{_column_letter(mapping[RESPONSE_ID_KEY])}1",
+            "values": [[RESPONSE_ID_HEADER]],
+        },
+    ]
+    data.extend(
+        {
+            "range": f"Responses!{_column_letter(mapping[q['id']])}1",
+            "values": [[_header_label(q)]],
+        }
+        for q in questions
+    )
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=form["sheet_id"],
+        body={"valueInputOption": "RAW", "data": data},
+    ).execute()
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=form["sheet_id"],
+        body={
+            "requests": [
+                {
+                    "updateSpreadsheetProperties": {
+                        "properties": {"title": f"{form['title']} — responses"},
+                        "fields": "title",
+                    }
+                }
+            ]
+        },
+    ).execute()
+
+
 def _format_value(value: Any) -> str:
     if value is None:
         return ""
@@ -222,21 +330,40 @@ def _format_value(value: Any) -> str:
 
 
 def append_response(
-    form: dict[str, Any], answers: dict[str, Any], submitted_at: Any = None
+    form: dict[str, Any],
+    response_id: str,
+    answers: dict[str, Any],
+    submitted_at: Any = None,
 ) -> None:
     """Append one response row. Raises on failure so the caller can retry."""
     if not enabled() or not form.get("sheet_id"):
         return
 
     service = _load_service()
-    questions = [q for q in form["questions"] if not q["archived"]]
+    questions = form.get("sheet_questions", form["questions"])
     mapping = _ensure_columns(service, form, questions)
+
+    response_id_index = mapping[RESPONSE_ID_KEY]
+    response_id_column = _column_letter(response_id_index)
+    existing = (
+        service.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=form["sheet_id"],
+            range=f"Responses!{response_id_column}2:{response_id_column}",
+        )
+        .execute()
+        .get("values", [])
+    )
+    if any(row and row[0] == response_id for row in existing):
+        return
 
     width = max(mapping.values(), default=0) + 1
     row: list[str] = [""] * width
     row[0] = _submitted_label(
         submitted_at or datetime.now(UTC).isoformat(timespec="seconds")
     )
+    row[response_id_index] = response_id
     for question_id, value in answers.items():
         index = mapping.get(question_id)
         if index is not None and index < width:

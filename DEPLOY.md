@@ -80,8 +80,9 @@ Set these in the Vercel project (Settings → Environment Variables):
 | `FORMCRAFT_GOOGLE_ENABLED` | `1` (only if you want live Sheets sync) |
 | `FORMCRAFT_GOOGLE_TOKEN_JSON` | printed by `scripts/google_setup.py` |
 
-Verify: `https://yourforms.vercel.app/healthz` should report
-`"role": "public"` and `"database": {"ready": true}`.
+Verify: `https://yourforms.vercel.app/healthz` should report `{"ok": true}`.
+The public health route deliberately hides role, database, and integration
+details from visitors.
 
 Then confirm the admin surface really is absent:
 
@@ -99,7 +100,9 @@ uv run python scripts/google_setup.py
 
 It prints the Cloud Console checklist, runs the consent flow, then **proves it
 works** by creating a real spreadsheet, writing to it, and deleting it again.
-Finally it prints the one-line token blob for Vercel.
+Because this repository is already linked to Vercel, the script can upload the
+token as a sensitive variable and enable live sync without exposing the token
+in terminal output.
 
 Two things in that checklist matter more than they look:
 
@@ -112,13 +115,16 @@ Two things in that checklist matter more than they look:
   of your Drive. The "unverified app" notice on the consent screen is expected
   and fine for your own account.
 
-### Do you even need Sheets on Vercel?
+### Direct live synchronization on Vercel
 
-Probably not. Responses always land in Postgres first. If you leave
-`FORMCRAFT_GOOGLE_ENABLED=0` on Vercel and `1` locally, submissions queue and
-sync when you press **Retry pending** on your dashboard. That keeps Google
-credentials off the public host entirely — a smaller blast radius, at the cost
-of rows appearing in the sheet in batches rather than instantly.
+No n8n host is required. The public Vercel Function saves the response in
+Postgres first, then appends it through the Google Sheets API. If Google is
+temporarily unavailable, the response remains pending and can be retried from
+the admin dashboard. A hidden response ID makes retries idempotent.
+
+If you prefer to keep the Google credential off the public host, leave
+`FORMCRAFT_GOOGLE_ENABLED=0` on Vercel and set it to `1` locally. Responses
+will then appear in Sheets in batches when you press **Retry pending**.
 
 ---
 
@@ -128,10 +134,9 @@ of rows appearing in the sheet in batches rather than instantly.
 function boots and connects. Subsequent requests are fast. Acceptable for
 forms; if it bothers you, Vercel's paid tiers keep functions warm.
 
-**Bundle size.** `psycopg[binary]` plus the Google client libraries land around
-60–80 MB, inside Vercel's 250 MB limit. If you drop Sheets from the public
-instance you can also drop the three `google-*` lines from `requirements.txt`
-and roughly halve it.
+**Function usage.** Vercel's free Hobby allowance is usage-capped and intended
+for personal, non-commercial projects. Formcraft's short request/response work
+fits the technical limits, but a business deployment should use Vercel Pro.
 
 **Static files.** Served by the app and cached for a year via `vercel.json`.
 Images you add under `web/static/img/` ship with the deployment — re-deploy

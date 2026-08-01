@@ -17,6 +17,8 @@
     <a class="btn btn-sm btn-ghost" href="{{ form.sheet_url }}" target="_blank" rel="noopener">Sheet ↗</a>
     {% elif google.enabled %}
     <button class="btn btn-sm btn-ghost" id="link-sheet">Create Sheet</button>
+    {% else %}
+    <span class="pill pill-draft"><span class="dot"></span>Sheets not connected</span>
     {% endif %}
   </div>
 </div>

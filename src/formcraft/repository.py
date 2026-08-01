@@ -280,6 +280,23 @@ def set_sheet(form_id: str, sheet_id: str, sheet_url: str, error: str = "") -> N
                 WHERE id = %s""",
             (sheet_id or None, sheet_url or None, error or None, form_id),
         )
+        if sheet_id:
+            # A newly linked (or deliberately replaced) spreadsheet needs a
+            # complete backfill. Responses may have been collected while
+            # Google was disconnected, so never trust their previous sync bit.
+            conn.execute(
+                """UPDATE responses SET synced = FALSE, sync_error = NULL
+                    WHERE form_id = %s""",
+                (form_id,),
+            )
+
+
+def set_sheet_error(form_id: str, error: str = "") -> None:
+    with transaction() as conn:
+        conn.execute(
+            "UPDATE forms SET sheet_error = %s WHERE id = %s",
+            (error or None, form_id),
+        )
 
 
 def save_response(form_id: str, answers: dict[str, Any]) -> str:
@@ -310,12 +327,13 @@ def list_responses(form_id: str, limit: int = 500) -> list[dict[str, Any]]:
         ).fetchall()
 
 
-def pending_sync(limit: int = 50) -> list[dict[str, Any]]:
+def pending_sync(limit: int = 50, form_id: str = "") -> list[dict[str, Any]]:
     with readonly() as conn:
         return conn.execute(
             """SELECT r.* FROM responses r
                 JOIN forms f ON f.id = r.form_id
                WHERE NOT r.synced AND f.sheet_id IS NOT NULL
+                 AND (%s = '' OR r.form_id = %s)
                ORDER BY r.submitted_at LIMIT %s""",
-            (limit,),
+            (form_id, form_id, limit),
         ).fetchall()

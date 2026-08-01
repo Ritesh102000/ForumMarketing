@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import contextlib
 import json
+import shutil
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -61,6 +63,30 @@ so they are yours to click — everything after is automatic.
 def _fail(message: str) -> int:
     print(f"\n✗ {message}")
     return 1
+
+
+def _vercel_cli() -> list[str]:
+    installed = shutil.which("vercel")
+    if installed:
+        return [installed]
+    if shutil.which("npx"):
+        return ["npx", "--yes", "vercel@latest"]
+    return []
+
+
+def _set_vercel_env(command: list[str], name: str, value: str, *, secret: bool) -> None:
+    args = [
+        *command,
+        "env",
+        "add",
+        name,
+        "production,preview",
+        "--force",
+        "--yes",
+        "--sensitive" if secret else "--no-sensitive",
+    ]
+    # stdin keeps refresh tokens out of process arguments and shell history.
+    subprocess.run(args, input=f"{value}\n", text=True, check=True)  # noqa: S603
 
 
 def main() -> int:  # noqa: C901 - a linear setup script reads better flat
@@ -146,15 +172,39 @@ def main() -> int:  # noqa: C901 - a linear setup script reads better flat
             "(steps 2 and 3 above)."
         )
 
-    # --- deployment blob ----------------------------------------------------
+    # --- deployment ---------------------------------------------------------
     blob = json.dumps(json.loads(creds.to_json()), separators=(",", ":"))
     print("\n" + "─" * 72)
     print("Local setup is done. Set FORMCRAFT_GOOGLE_ENABLED=1 in .env.")
-    print("\nFor Vercel, add this environment variable:\n")
-    print("  FORMCRAFT_GOOGLE_TOKEN_JSON")
-    print(f"  {blob}\n")
-    print("Or from the CLI:")
-    print("  vercel env add FORMCRAFT_GOOGLE_TOKEN_JSON production")
+
+    vercel = _vercel_cli()
+    if vercel and (Path.cwd() / ".vercel" / "project.json").exists():
+        answer = input(
+            "\nUpload the credential to the linked Vercel project now? [Y/n] "
+        ).strip().lower()
+        if answer in ("", "y", "yes"):
+            try:
+                _set_vercel_env(
+                    vercel, "FORMCRAFT_GOOGLE_TOKEN_JSON", blob, secret=True
+                )
+                _set_vercel_env(
+                    vercel, "FORMCRAFT_GOOGLE_ENABLED", "1", secret=False
+                )
+            except subprocess.CalledProcessError as exc:
+                return _fail(
+                    f"Google works locally, but Vercel rejected the environment "
+                    f"update (exit {exc.returncode}). Re-run this script after "
+                    "checking `vercel whoami`."
+                )
+            print("✓ Vercel Production and Preview variables updated securely")
+            print("  Redeploy once so the running app receives them.")
+        else:
+            print("Vercel upload skipped. Re-run this script when ready.")
+    else:
+        print(
+            "\nVercel is not linked here. The token remains only in the "
+            f"protected local file: {settings.google_token_file}"
+        )
     print("─" * 72)
     return 0
 

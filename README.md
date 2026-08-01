@@ -137,7 +137,9 @@ gated on the same is-this-machine check as the rest of the admin surface, so the
 key never crosses the network. The tradeoff is that refresh works only while
 your admin server is running. Rotate or revoke the key any time.
 
-**3. Google Sheets.** A spreadsheet per form, rows appended live. Set-up below.
+**3. Google Sheets.** Direct app-to-Google integration; n8n is not involved. A
+spreadsheet is created per form, existing responses are backfilled, form edits
+update the headers, and new submissions append live.
 
 Exports include questions you have since **deleted** from the form, marked
 `(removed)`. Those answers still exist in past responses, and dropping the
@@ -159,7 +161,9 @@ uv run python scripts/google_setup.py
 
 It walks you through the console steps, runs the consent flow, then verifies by
 creating a real spreadsheet and deleting it — so you find out immediately if an
-API is not enabled, rather than on your first response.
+API is not enabled, rather than on your first response. When the repository is
+linked to Vercel, it can securely upload the refresh token and enable live sync
+without printing the token or asking you to copy it.
 
 7. Set `FORMCRAFT_GOOGLE_ENABLED=1` in `.env` and restart.
 
@@ -169,10 +173,11 @@ rest of your Drive. That scope is also **non-sensitive**, which means you can
 publish the OAuth app to Production with no Google verification review. Do
 publish it: in Testing status Google expires the refresh token after 7 days.
 
-Only the admin instance needs Google credentials for *creating* sheets. If you
-also want the public instance to append rows live, give it the same token file;
-otherwise responses queue in Postgres and sync when you hit **Retry pending**
-on the dashboard.
+The local admin needs the Google credential to create and update spreadsheets.
+For instant live rows, put the same token in Vercel as
+`FORMCRAFT_GOOGLE_TOKEN_JSON`; otherwise responses remain queued in Postgres
+and sync when you press **Retry pending** locally. Each row carries a hidden
+Formcraft response ID, so a retry cannot append the same response twice.
 
 ## How it works
 
