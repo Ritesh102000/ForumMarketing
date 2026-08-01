@@ -139,6 +139,10 @@ def pool() -> ConnectionPool | _PerRequestPool:
             min_size=1,
             max_size=settings.db_pool_size,
             kwargs={"row_factory": dict_row},
+            # Neon can close an idle SSL socket while the local admin remains
+            # open. Validate on checkout so the pool replaces that socket
+            # before a dashboard or editor request receives it.
+            check=ConnectionPool.check_connection,
             open=True,
         )
     return _pool

@@ -299,6 +299,17 @@ def test_responses_page_renders(admin_client):
     assert page.status_code == 200 and "@visible" in page.text
 
 
+def test_new_form_redirect_target_renders_serializable_builder_data(admin_client):
+    """Postgres timestamps and Sheet metadata must never enter FORM_DATA."""
+    form_id = admin_client.post("/api/forms", json=sample_form()).json()["id"]
+
+    page = admin_client.get(f"/admin/{form_id}")
+
+    assert page.status_code == 200
+    assert "window.FORM_DATA" in page.text
+    assert "Creator intake" in page.text
+
+
 # --------------------------------------------------------------- role split
 
 

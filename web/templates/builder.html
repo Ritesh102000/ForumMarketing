@@ -106,7 +106,7 @@
 {% block scripts %}
 <script>
   window.FORM_ID = {{ (form.id | tojson) if form else 'null' }};
-  window.FORM_DATA = {{ (form | tojson) if form else 'null' }};
+  window.FORM_DATA = {{ (form_data | tojson) if form_data else 'null' }};
   window.OPTION_TYPES = ["select", "radio", "checkbox"];
   window.SCALE_TYPES = ["scale", "rating", "number"];
 </script>

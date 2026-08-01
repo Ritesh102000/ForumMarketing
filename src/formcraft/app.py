@@ -149,6 +149,7 @@ def _register_admin(app: FastAPI) -> None:  # noqa: C901 - route table, flat by 
             request,
             "builder.html",
             form=None,
+            form_data=None,
             question_types=QUESTION_TYPES,
             base_url=settings.base_url,
         )
@@ -178,6 +179,7 @@ def _register_admin(app: FastAPI) -> None:  # noqa: C901 - route table, flat by 
             request,
             "builder.html",
             form=form,
+            form_data=_editor_payload(form),
             question_types=QUESTION_TYPES,
             base_url=settings.base_url,
         )
@@ -394,6 +396,44 @@ def _parse_form(raw: Any) -> FormIn:
         return FormIn.model_validate(raw)
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+
+def _editor_payload(form: dict[str, Any]) -> dict[str, Any]:
+    """Only JSON-safe fields needed by builder.js.
+
+    Database rows also contain timezone-aware datetimes and Sheet metadata.
+    Passing the whole row through Jinja's ``tojson`` makes an otherwise
+    successful form creation crash on the redirect to its editor.
+    """
+    return {
+        "title": form["title"],
+        "description": form["description"],
+        "display_mode": form["display_mode"],
+        "accent": form["accent"],
+        "is_published": form["is_published"],
+        "confirm_msg": form["confirm_msg"],
+        "sections": [
+            {
+                "id": section["id"],
+                "title": section["title"],
+                "description": section["description"],
+                "questions": [
+                    {
+                        "id": question["id"],
+                        "type": question["type"],
+                        "label": question["label"],
+                        "help_text": question["help_text"],
+                        "placeholder": question["placeholder"],
+                        "required": question["required"],
+                        "options": question["options"],
+                        "config": question["config"],
+                    }
+                    for question in section["questions"]
+                ],
+            }
+            for section in form["sections"]
+        ],
+    }
 
 
 def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
