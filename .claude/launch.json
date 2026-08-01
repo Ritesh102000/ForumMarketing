@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "formcraft",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "scripts/run.py"],
+      "port": 8480
+    }
+  ]
+}

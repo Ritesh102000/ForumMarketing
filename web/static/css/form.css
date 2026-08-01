@@ -1,0 +1,124 @@
+/* The public form — the surface people you send links to actually see. */
+
+body.public { background: var(--bg-tint); }
+
+.preview-banner {
+  background: var(--warn); color: #1a1206; text-align: center;
+  padding: 9px var(--sp-4); font-size: var(--step--1); font-weight: 580;
+}
+
+.progress { height: 3px; background: var(--surface-3); position: sticky; top: 0; z-index: 10; }
+.progress-bar {
+  height: 100%; width: 0; border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--highlight)));
+  transition: width .35s var(--ease);
+}
+
+.form-cover { position: relative; }
+.form-cover .media, .form-cover .media-ph {
+  width: 100%; height: 180px; border-radius: 0; border-inline: 0; border-top: 0;
+}
+.form-cover .media img { height: 180px; object-fit: cover; }
+
+.form-shell { max-width: 700px; margin-inline: auto; padding: var(--sp-7) var(--sp-5) var(--sp-8); }
+
+.form-intro { margin-bottom: var(--sp-6); display: grid; gap: var(--sp-4); }
+.form-intro h1 { font-family: var(--font-display); font-size: var(--step-4); font-weight: 500; }
+.form-intro .lede { font-size: var(--step-1); }
+
+/* Who is asking --------------------------------------------------------- */
+
+.sender {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface);
+}
+.sender .media, .sender .media-ph { width: 52px; height: 52px; flex: none; aspect-ratio: 1; border-radius: 50%; }
+.sender__name { font-weight: 600; font-size: var(--step-0); }
+.sender__role { font-size: var(--step--1); color: var(--muted); }
+
+.trust { display: grid; gap: var(--sp-3); margin-top: var(--sp-5); }
+.trust .eyebrow { font-size: 0.68rem; }
+
+/* Steps ----------------------------------------------------------------- */
+
+.step { border: 0; padding: 0; margin: 0; display: grid; gap: var(--sp-6); }
+/* One-page mode stacks every section, so they need air between them. In the
+   stepped modes only one is ever visible and this never applies. */
+.step + .step { margin-top: var(--sp-7); }
+.step.enter { animation: rise .34s var(--ease); }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+.section-legend { padding: 0; margin-bottom: var(--sp-1); display: grid; gap: 4px; }
+.section-legend h2 { font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; }
+.section-legend p { color: var(--muted); font-size: var(--step-0); }
+
+/* Fields ---------------------------------------------------------------- */
+
+.field { display: grid; gap: 10px; }
+.field-label { font-weight: 560; font-size: var(--step-1); line-height: 1.35; }
+.field-label > .req { display: inline; color: var(--danger); margin-left: 3px; }
+.field-help { color: var(--muted); font-size: var(--step--1); margin: -4px 0 0; }
+.field.has-error input, .field.has-error select, .field.has-error textarea { border-color: var(--danger); }
+.field-error { color: var(--danger); font-size: var(--step--1); margin: 0; }
+
+.choices { display: grid; gap: 9px; }
+.choice {
+  display: flex; align-items: center; gap: 11px;
+  padding: 13px 16px; border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  background: var(--surface); cursor: pointer;
+  transition: border-color .16s var(--ease), background .16s var(--ease);
+}
+.choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); }
+.choice input { width: auto; margin: 0; accent-color: var(--accent); }
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.scale { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.scale-item input { position: absolute; opacity: 0; pointer-events: none; }
+.scale-item span {
+  display: grid; place-items: center; width: 48px; height: 48px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  cursor: pointer; font-weight: 560; background: var(--surface);
+  transition: all .16s var(--ease);
+}
+.scale-item:hover span { border-color: var(--accent); }
+.scale-item:has(input:checked) span {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+
+.rating { display: flex; gap: 5px; }
+.star input { position: absolute; opacity: 0; pointer-events: none; }
+.star span {
+  font-size: 2.1rem; line-height: 1; color: var(--surface-3); cursor: pointer;
+  transition: color .13s var(--ease), transform .13s var(--ease);
+}
+.star.on span, .star:has(input:checked) span { color: var(--highlight); }
+.star:hover span { transform: scale(1.14); }
+
+/* Navigation ------------------------------------------------------------ */
+
+.form-nav { display: flex; gap: var(--sp-3); margin-top: var(--sp-7); align-items: center; }
+.form-nav .btn { min-width: 124px; }
+.form-nav .hint { font-size: var(--step--1); color: var(--muted); margin-left: auto; }
+@media (max-width: 560px) { .form-nav .hint { display: none; } }
+
+/* Done ------------------------------------------------------------------ */
+
+.done {
+  text-align: center; padding: var(--sp-8) 0; display: grid;
+  gap: var(--sp-4); justify-items: center; animation: rise .4s var(--ease);
+}
+.done .media, .done .media-ph { width: min(260px, 70%); aspect-ratio: 1; }
+.done h2 { font-family: var(--font-display); font-size: var(--step-3); font-weight: 500; }
+
+.form-footer {
+  margin-top: var(--sp-8); padding-top: var(--sp-4);
+  border-top: 1px solid var(--border); text-align: center;
+  font-size: var(--step--1); color: var(--muted);
+}

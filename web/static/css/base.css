@@ -1,0 +1,81 @@
+/* Reset and element defaults. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Author `display:` rules outrank the UA sheet's [hidden] rule, so anything
+   given a display value would ignore the hidden attribute. Restore it once,
+   globally, rather than guarding every component. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { margin: 0; line-height: 1.2; letter-spacing: -0.021em; font-weight: 600; }
+h1 { font-size: var(--step-3); }
+h2 { font-size: var(--step-2); }
+h3 { font-size: var(--step-1); }
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.eyebrow {
+  font-size: var(--step--1);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+p { margin: 0; }
+.lede { font-size: var(--step-1); color: var(--text-2); max-width: var(--measure); }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+img, svg, video { max-width: 100%; height: auto; display: block; }
+
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+
+::selection { background: var(--brand-soft); }
+
+/* Utilities ------------------------------------------------------------ */
+
+.muted { color: var(--muted); }
+.dim { color: var(--text-2); }
+.small { font-size: var(--step--1); }
+.nowrap { white-space: nowrap; }
+.inline { display: inline; }
+.hidden { display: none !important; }
+.stack { display: grid; gap: var(--sp-4); }
+.row { display: flex; align-items: center; gap: var(--sp-2); }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
+.push { margin-left: auto; }
+.clamp-2 {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.wrap { max-width: var(--wrap); margin-inline: auto; padding: var(--sp-6) var(--sp-5) var(--sp-8); }
+.wrap-narrow { max-width: var(--wrap-narrow); margin-inline: auto; }
+.center-screen { min-height: 100dvh; display: grid; place-items: center; padding: var(--sp-5); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

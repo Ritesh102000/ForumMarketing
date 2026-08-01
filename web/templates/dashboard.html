@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import media, pill %}
+{% block title %}Forms — {{ brand_name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Workspace</p>
+    <h1 class="display">Your forms</h1>
+    <p class="muted small">{{ forms|length }} form{{ '' if forms|length == 1 else 's' }} · {{ forms|sum(attribute='response_count') }} total responses</p>
+  </div>
+  <a href="/admin/new" class="btn btn-primary">New form</a>
+</div>
+
+{# Only surfaced when Sheets is actually switched on. With it off the product
+   is download + live link, and a permanent "sync is off" banner is just noise. #}
+{% if google.enabled %}
+<div class="status-bar {{ 'is-ok' if google.ready else 'is-warn' }}">
+  <span class="dot"></span>
+  <strong>Google Sheets</strong>
+  <span class="muted">{{ google.detail }}</span>
+  <button class="btn btn-sm btn-ghost push" id="retry-sync">Retry pending</button>
+</div>
+{% endif %}
+
+{% if not forms %}
+<div class="empty">
+  {{ media("dashboard-empty", slots, media_url) }}
+  <div>
+    <h2>No forms yet</h2>
+    <p class="muted">Build an intake form, an onboarding questionnaire, or a feedback survey.</p>
+  </div>
+  <a href="/admin/new" class="btn btn-primary btn-lg">Create your first form</a>
+</div>
+{% else %}
+<div class="form-grid">
+  {% for f in forms %}
+  <article class="card card-hover form-card" style="--accent: {{ f.accent }}">
+    <div class="form-card__cover">
+      {{ media("form-cover", slots, media_url, variant=f.slug, compact=True) }}
+      <div class="form-card__accent"></div>
+    </div>
+
+    <div class="form-card__body">
+      <div class="spread">
+        <h2><a href="/admin/{{ f.id }}">{{ f.title }}</a></h2>
+        {{ pill(f.is_published) }}
+      </div>
+      {% if f.description %}<p class="muted small clamp-2">{{ f.description }}</p>{% endif %}
+
+      <dl class="meta">
+        <div><dt>Questions</dt><dd>{{ f.question_count }}</dd></div>
+        <div><dt>Responses</dt><dd>{{ f.response_count }}</dd></div>
+        <div><dt>Layout</dt><dd>{{ {'single':'One page','section':'By section','one_by_one':'One at a time'}[f.display_mode] }}</dd></div>
+      </dl>
+
+      <div class="card-actions">
+        <a class="btn btn-sm" href="/admin/{{ f.id }}">Edit</a>
+        <a class="btn btn-sm" href="/admin/{{ f.id }}/responses">Responses</a>
+        <a class="btn btn-sm" href="/f/{{ f.public_ref }}" target="_blank" rel="noopener">Preview</a>
+        {% if f.response_count %}
+        <a class="btn btn-sm" href="/admin/{{ f.id }}/export.xlsx">Excel</a>
+        {% endif %}
+        {% if f.sheet_url %}
+        <a class="btn btn-sm btn-ghost" href="{{ f.sheet_url }}" target="_blank" rel="noopener">Sheet ↗</a>
+        {% endif %}
+      </div>
+
+      <div class="share">
+        <input readonly value="{{ base_url }}/f/{{ f.public_ref }}" data-copy>
+        <button class="btn btn-sm btn-ghost" data-copy-btn>Copy</button>
+      </div>
+
+      {% if f.sheet_error %}
+      <p class="alert alert-error small">Sheet: {{ f.sheet_error }}</p>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-copy-btn]').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    await navigator.clipboard.writeText(btn.previousElementSibling.value);
+    const original = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = original; }, 1200);
+  });
+});
+
+const retry = document.getElementById('retry-sync');
+retry?.addEventListener('click', async () => {
+  retry.disabled = true;
+  retry.textContent = 'Syncing…';
+  const data = await (await fetch('/api/sync', { method: 'POST' })).json();
+  retry.textContent = `${data.synced}/${data.attempted} synced`;
+  setTimeout(() => { retry.disabled = false; retry.textContent = 'Retry pending'; }, 2000);
+});
+</script>
+{% endblock %}

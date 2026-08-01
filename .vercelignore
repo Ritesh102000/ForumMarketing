@@ -1,0 +1,11 @@
+.venv/
+data/
+tests/
+scripts/
+.env
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+uv.lock
+IMAGES.md

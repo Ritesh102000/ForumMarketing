@@ -1,0 +1,161 @@
+{% from "components/ui.html" import media, trust_strip %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ form.title }}</title>
+  <meta name="description" content="{{ form.description or form.title }}">
+  <meta property="og:title" content="{{ form.title }}">
+  <meta property="og:description" content="{{ form.description or 'Fill in this form.' }}">
+  {% set og = media_url('og-default') %}
+  {% if og %}<meta property="og:image" content="{{ og }}">{% endif %}
+  <meta name="twitter:card" content="summary_large_image">
+  {# Belt and braces with the X-Robots-Tag header: an unguessable URL stops
+     being private the moment a crawler indexes it. #}
+  <meta name="robots" content="noindex, nofollow, noarchive">
+
+  <link rel="stylesheet" href="{{ static_url('css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/form.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◆</text></svg>">
+  <style>:root { --accent: {{ form.accent }}; }</style>
+</head>
+<body class="public">
+  {% if preview %}
+  <div class="preview-banner">Preview — this form is a draft and is not collecting responses.</div>
+  {% endif %}
+
+  <div class="progress"><div class="progress-bar" id="progress"></div></div>
+
+  {% if media_url("form-cover", form.slug) %}
+  <div class="form-cover" id="cover">
+    {# Override the macro's inline aspect-ratio: a banner should span the full
+       width at a fixed height, not shrink to satisfy the ratio. #}
+    {{ media("form-cover", slots, media_url, variant=form.slug, compact=True,
+             style="aspect-ratio:auto;height:180px;width:100%") }}
+  </div>
+  {% endif %}
+
+  <main class="form-shell">
+    <form id="form" novalidate>
+      <header class="form-intro" id="intro">
+        <div>
+          <h1 class="display">{{ form.title }}</h1>
+          {% if form.description %}<p class="lede">{{ form.description }}</p>{% endif %}
+        </div>
+
+        {% if owner_name %}
+        <div class="sender">
+          {% if media_url("owner-avatar") %}
+          {{ media("owner-avatar", slots, media_url) }}
+          {% endif %}
+          <div>
+            <div class="sender__name">{{ owner_name }}</div>
+            {% if owner_role %}<div class="sender__role">{{ owner_role }}</div>{% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </header>
+
+      {% for section in form.sections %}
+      <fieldset class="step" data-step data-section="{{ loop.index0 }}">
+        {% if section.title or section.description %}
+        <legend class="section-legend">
+          {% if section.title %}<h2>{{ section.title }}</h2>{% endif %}
+          {% if section.description %}<p>{{ section.description }}</p>{% endif %}
+        </legend>
+        {% endif %}
+
+        {% for q in section.questions %}
+        <div class="field" data-question="{{ q.id }}" data-type="{{ q.type }}" data-required="{{ 1 if q.required else 0 }}">
+          <label class="field-label" for="q-{{ q.id }}">
+            {{ q.label }}{% if q.required %}<span class="req" aria-hidden="true">*</span>{% endif %}
+          </label>
+          {% if q.help_text %}<p class="field-help">{{ q.help_text }}</p>{% endif %}
+
+          {% if q.type in ['short_text', 'email', 'date', 'time'] %}
+            <input id="q-{{ q.id }}" name="{{ q.id }}"
+                   type="{{ {'short_text':'text','email':'email','date':'date','time':'time'}[q.type] }}"
+                   placeholder="{{ q.placeholder }}">
+
+          {% elif q.type == 'number' %}
+            <input id="q-{{ q.id }}" name="{{ q.id }}" type="number" placeholder="{{ q.placeholder }}"
+                   {% if q.config.min is not none %}min="{{ q.config.min }}"{% endif %}
+                   {% if q.config.max is not none %}max="{{ q.config.max }}"{% endif %}>
+
+          {% elif q.type == 'long_text' %}
+            <textarea id="q-{{ q.id }}" name="{{ q.id }}" rows="4" placeholder="{{ q.placeholder }}"></textarea>
+
+          {% elif q.type == 'select' %}
+            <select id="q-{{ q.id }}" name="{{ q.id }}">
+              <option value="">Choose…</option>
+              {% for opt in q.options %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}
+            </select>
+
+          {% elif q.type in ['radio', 'checkbox'] %}
+            <div class="choices">
+              {% for opt in q.options %}
+              <label class="choice">
+                <input type="{{ q.type }}" name="{{ q.id }}" value="{{ opt }}"><span>{{ opt }}</span>
+              </label>
+              {% endfor %}
+            </div>
+
+          {% elif q.type == 'scale' %}
+            <div class="scale" role="radiogroup">
+              {% for n in range(q.config.get('min', 1)|int, q.config.get('max', 5)|int + 1) %}
+              <label class="scale-item"><input type="radio" name="{{ q.id }}" value="{{ n }}"><span>{{ n }}</span></label>
+              {% endfor %}
+            </div>
+
+          {% elif q.type == 'rating' %}
+            <div class="rating" data-max="{{ q.config.get('max', 5) }}">
+              {% for n in range(1, q.config.get('max', 5)|int + 1) %}
+              <label class="star"><input type="radio" name="{{ q.id }}" value="{{ n }}"><span aria-hidden="true">★</span></label>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <p class="field-error" hidden></p>
+        </div>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+
+      <div class="form-nav">
+        <button type="button" class="btn btn-ghost" id="back" hidden>Back</button>
+        <button type="button" class="btn btn-primary btn-lg" id="next" hidden>Continue</button>
+        <button type="submit" class="btn btn-primary btn-lg" id="submit">Submit</button>
+        <span class="hint" id="hint" hidden>press <kbd>Enter</kbd></span>
+      </div>
+    </form>
+
+    <div class="done" id="done" hidden>
+      {% if media_url("form-success") %}
+      {{ media("form-success", slots, media_url) }}
+      {% endif %}
+      <h2 id="done-msg">{{ form.confirm_msg }}</h2>
+      <button class="btn btn-ghost" id="again">Submit another response</button>
+    </div>
+
+    {% if media_url("trust-logo-1") or media_url("trust-logo-2") or
+          media_url("trust-logo-3") or media_url("trust-logo-4") %}
+    <div class="trust" id="trust">
+      <p class="eyebrow">Trusted by</p>
+      {{ trust_strip(slots, media_url) }}
+    </div>
+    {% endif %}
+
+    <p class="form-footer">Powered by {{ brand_name }}</p>
+  </main>
+
+  <script>
+    window.FORM_MODE = {{ form.display_mode | tojson }};
+    window.FORM_REF = {{ form.public_ref | tojson }};
+    window.IS_PREVIEW = {{ preview | tojson }};
+  </script>
+  <script src="{{ static_url('form.js') }}"></script>
+</body>
+</html>

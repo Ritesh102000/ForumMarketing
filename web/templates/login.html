@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import media, brand %}
+{% block title %}Sign in — {{ brand_name }}{% endblock %}
+{% block chrome %}{% endblock %}
+{% block main_class %}auth-split{% endblock %}
+
+{% block content %}
+<div class="auth-visual">
+  {# The macro sets aspect-ratio inline; override it so the panel fills the column. #}
+  {{ media("login-panel", slots, media_url, style="aspect-ratio:auto;height:100%") }}
+  <div class="auth-visual__quote">
+    <p class="display">Treat yourself like a real business, and you never have another bad month.</p>
+    <cite>{{ owner_name }}{% if owner_role %} · {{ owner_role }}{% endif %}</cite>
+  </div>
+</div>
+
+<div class="auth-form">
+  <div class="auth-card">
+    {{ brand(slots, media_url, name=brand_name, href="#") }}
+    <div>
+      <h1 class="display" style="font-size: var(--step-3)">Welcome back</h1>
+      <p class="muted small">Admin access only. This screen is not reachable from the internet.</p>
+    </div>
+
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+    <form method="post" action="/login" class="stack">
+      <label class="field-row">
+        <span>Username</span>
+        <input type="text" name="username" autocomplete="username" required autofocus>
+      </label>
+      <label class="field-row">
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

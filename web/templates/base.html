@@ -1,0 +1,34 @@
+{% from "components/ui.html" import brand %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ brand_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ static_url('css/tokens.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
+  <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
+  {% block styles %}<link rel="stylesheet" href="{{ static_url('css/admin.css') }}">{% endblock %}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◆</text></svg>">
+  {% block head %}{% endblock %}
+</head>
+<body{% if body_class %} class="{{ body_class }}"{% endif %}>
+  {% block chrome %}
+  <header class="topbar">
+    {{ brand(slots, media_url, name=brand_name) }}
+    <nav>
+      <a href="/">Forms</a>
+      <a href="/admin/media">Images</a>
+      <a href="/admin/new" class="btn btn-sm">New form</a>
+      <form method="post" action="/logout" class="inline">
+        <button type="submit" class="btn btn-sm btn-ghost">Sign out</button>
+      </form>
+    </nav>
+  </header>
+  {% endblock %}
+  <main class="{% block main_class %}wrap{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

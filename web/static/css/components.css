@@ -1,0 +1,189 @@
+/* Reusable UI primitives. Nothing here knows about a specific page. */
+
+/* Buttons -------------------------------------------------------------- */
+
+.btn {
+  --btn-bg: var(--surface);
+  --btn-fg: var(--text);
+  --btn-bd: var(--border-strong);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  padding: 10px 18px;
+  border: 1px solid var(--btn-bd);
+  border-radius: var(--r-pill);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font: inherit; font-weight: 560; line-height: 1;
+  cursor: pointer; white-space: nowrap;
+  transition: background .16s var(--ease), border-color .16s var(--ease),
+              transform .08s var(--ease), box-shadow .16s var(--ease);
+}
+.btn:hover { background: var(--surface-2); text-decoration: none; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-primary {
+  --btn-bg: var(--accent); --btn-fg: #fff; --btn-bd: transparent;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 86%, #000); }
+
+.btn-ghost { --btn-bg: transparent; --btn-bd: transparent; --btn-fg: var(--muted); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-danger { --btn-fg: var(--danger); --btn-bd: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+.btn-dashed {
+  --btn-bg: transparent; --btn-fg: var(--muted);
+  border-style: dashed; border-radius: var(--r-md); width: 100%; padding: 14px;
+}
+.btn-dashed:hover { color: var(--accent); border-color: var(--accent); background: var(--brand-soft); }
+
+.btn-sm { padding: 7px 13px; font-size: var(--step--1); }
+.btn-lg { padding: 14px 26px; font-size: var(--step-1); }
+.btn-block { width: 100%; }
+
+.icon-btn {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted); cursor: pointer; font-size: .78rem;
+  transition: background .14s var(--ease), color .14s var(--ease);
+}
+.icon-btn:hover { background: var(--surface-3); color: var(--text); }
+.icon-btn.danger:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
+/* Surfaces ------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-sm);
+}
+.card-lg { padding: var(--sp-6); border-radius: var(--r-xl); box-shadow: var(--shadow-md); }
+.card-hover { transition: transform .2s var(--ease), box-shadow .2s var(--ease); }
+.card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+
+/* Form controls -------------------------------------------------------- */
+
+.input, input[type="text"], input[type="password"], input[type="email"],
+input[type="number"], input[type="date"], input[type="time"], select, textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  transition: border-color .16s var(--ease), box-shadow .16s var(--ease);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .75; }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: var(--ring);
+}
+textarea { resize: vertical; min-height: 84px; }
+input[type="color"] { width: 52px; height: 40px; padding: 3px; cursor: pointer; }
+
+.field-row > span, .label { display: block; font-size: var(--step--1); font-weight: 560; margin-bottom: 6px; }
+
+.toggle { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.toggle input { width: auto; margin-top: 4px; accent-color: var(--accent); }
+.toggle strong { display: block; font-weight: 560; font-size: var(--step-0); }
+.toggle em { display: block; font-style: normal; font-size: var(--step--1); color: var(--muted); }
+
+/* Badges --------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.7rem; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: var(--r-pill);
+}
+.pill-live { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.pill-draft { background: var(--surface-3); color: var(--muted); }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+
+.alert { padding: 12px 16px; border-radius: var(--r-md); font-size: var(--step--1); }
+.alert-error { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.alert-warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+
+/* Brand ---------------------------------------------------------------- */
+
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-weight: 640; }
+.brand:hover { text-decoration: none; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  object-fit: cover; background: var(--brand); color: #fff;
+  display: grid; place-items: center; font-size: 15px; font-weight: 700;
+}
+.brand-name { letter-spacing: -0.02em; }
+
+.avatar {
+  border-radius: 50%; object-fit: cover; flex: none;
+  background: var(--surface-3); border: 1px solid var(--border);
+}
+.avatar-sm { width: 32px; height: 32px; }
+.avatar-md { width: 52px; height: 52px; }
+
+/* Image placeholders --------------------------------------------------- */
+/* Rendered when no asset exists yet. The description tells you what to make. */
+
+.media { position: relative; overflow: hidden; border-radius: var(--r-md); background: var(--surface-2); }
+.media img { width: 100%; height: 100%; object-fit: cover; }
+
+.media-ph {
+  display: grid; align-content: center; gap: 6px;
+  padding: var(--sp-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--r-md);
+  background:
+    repeating-linear-gradient(45deg,
+      transparent 0 10px,
+      color-mix(in srgb, var(--muted) 5%, transparent) 10px 20px);
+  color: var(--muted);
+  text-align: left;
+}
+.media-ph__slot {
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--accent); font-weight: 600;
+}
+.media-ph__desc { font-size: var(--step--1); line-height: 1.45; max-width: 46ch; }
+.media-ph__meta { font-family: var(--font-mono); font-size: 0.66rem; opacity: .75; }
+.media-ph.is-round { border-radius: 50%; place-content: center; text-align: center; }
+.media-ph.is-round .media-ph__desc, .media-ph.is-round .media-ph__meta { display: none; }
+
+/* Compact: name and size only. The full brief stays in the title attribute. */
+.media-ph.is-compact { place-content: center; text-align: center; gap: 2px; }
+.media-ph.is-compact .media-ph__desc { display: none; }
+
+/* Logo strip ----------------------------------------------------------- */
+
+.logo-strip { display: flex; align-items: center; gap: var(--sp-5); flex-wrap: wrap; }
+.logo-strip img { height: 26px; width: auto; opacity: .62; filter: grayscale(1); }
+.logo-strip .media-ph { padding: 8px 14px; }
+
+/* Tables --------------------------------------------------------------- */
+
+.table-scroll {
+  overflow-x: auto; border: 1px solid var(--border);
+  border-radius: var(--r-lg); background: var(--surface);
+}
+table.data { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+table.data th, table.data td {
+  padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top;
+}
+table.data th {
+  background: var(--surface-2); font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); position: sticky; top: 0; font-weight: 650;
+}
+table.data tr:last-child td { border-bottom: 0; }
+table.data td { max-width: 320px; }
+
+/* Empty states --------------------------------------------------------- */
+
+.empty {
+  display: grid; gap: var(--sp-4); justify-items: center; text-align: center;
+  padding: var(--sp-8) var(--sp-5); color: var(--muted);
+}
+.empty .media, .empty .media-ph { width: min(320px, 100%); }
