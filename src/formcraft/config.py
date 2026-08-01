@@ -66,7 +66,13 @@ def load_settings() -> Settings:
 
     return Settings(
         root=ROOT,
-        database_url=os.getenv("FORMCRAFT_DATABASE_URL", "").strip(),
+        # Vercel marketplace Postgres integrations expose DATABASE_URL. Keep
+        # the Formcraft-specific name as the explicit override for local and
+        # non-Vercel deployments.
+        database_url=(
+            os.getenv("FORMCRAFT_DATABASE_URL")
+            or os.getenv("DATABASE_URL", "")
+        ).strip(),
         db_pool_size=int(os.getenv("FORMCRAFT_DB_POOL_SIZE", "5")),
         web_dir=ROOT / "web",
         role=role,

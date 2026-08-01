@@ -23,19 +23,9 @@
 {%- endmacro %}
 
 {% macro brand(slots, media_url, name="Formcraft", href="/") -%}
-  {%- set mark = media_url("brand-mark") -%}
-  {%- set wordmark = media_url("brand-wordmark") -%}
   <a class="brand" href="{{ href }}">
-    {% if mark %}
-      <img class="brand-mark" src="{{ mark }}" alt="">
-    {% else %}
-      <span class="brand-mark">{{ name[0] | upper }}</span>
-    {% endif %}
-    {% if wordmark %}
-      <img src="{{ wordmark }}" alt="{{ name }}" style="height:19px;width:auto">
-    {% else %}
-      <span class="brand-name">{{ name }}</span>
-    {% endif %}
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">{{ name }}</span>
   </a>
 {%- endmacro %}
 

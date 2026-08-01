@@ -72,7 +72,7 @@ Set these in the Vercel project (Settings → Environment Variables):
 
 | Variable | Value |
 |---|---|
-| `FORMCRAFT_DATABASE_URL` | the **pooled** Neon string |
+| `DATABASE_URL` | the **pooled** Neon string (added automatically by Vercel's Neon integration) |
 | `FORMCRAFT_ROLE` | `public` |
 | `FORMCRAFT_BRAND_NAME` | your business name |
 | `FORMCRAFT_BASE_URL` | `https://yourforms.vercel.app` |

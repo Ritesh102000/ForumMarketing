@@ -172,7 +172,7 @@ form.addEventListener('submit', async (event) => {
     alert(err.message || 'Could not submit. Please try again.');
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit';
+    submitBtn.textContent = 'Send response';
   }
 });
 

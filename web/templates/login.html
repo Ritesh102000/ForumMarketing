@@ -1,25 +1,28 @@
 {% extends "base.html" %}
 {% from "components/ui.html" import media, brand %}
-{% block title %}Sign in — {{ brand_name }}{% endblock %}
+{% block title %}Admin sign in — {{ brand_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
 {% block chrome %}{% endblock %}
 {% block main_class %}auth-split{% endblock %}
 
 {% block content %}
-<div class="auth-visual">
-  {# The macro sets aspect-ratio inline; override it so the panel fills the column. #}
+<section class="auth-visual" aria-label="Formcraft workspace">
   {{ media("login-panel", slots, media_url, style="aspect-ratio:auto;height:100%") }}
-  <div class="auth-visual__quote">
-    <p class="display">Treat yourself like a real business, and you never have another bad month.</p>
-    <cite>{{ owner_name }}{% if owner_role %} · {{ owner_role }}{% endif %}</cite>
+  <div class="auth-visual__copy">
+    <p class="kicker">Private workspace</p>
+    <h2 class="display">Your forms, responses, and exports in one focused place.</h2>
+    <p>Create a link for each audience. People can fill only the form you send them; the admin workspace stays on your device.</p>
   </div>
-</div>
+</section>
 
-<div class="auth-form">
+<section class="auth-form">
   <div class="auth-card">
     {{ brand(slots, media_url, name=brand_name, href="#") }}
-    <div>
-      <h1 class="display" style="font-size: var(--step-3)">Welcome back</h1>
-      <p class="muted small">Admin access only. This screen is not reachable from the internet.</p>
+
+    <div class="auth-card__head">
+      <p class="eyebrow">Admin access</p>
+      <h1 class="display">Welcome back</h1>
+      <p class="muted">Sign in to manage forms and download responses.</p>
     </div>
 
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
@@ -35,6 +38,11 @@
       </label>
       <button type="submit" class="btn btn-primary btn-block btn-lg">Sign in</button>
     </form>
+
+    <p class="auth-security">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+      Admin access is limited to this device.
+    </p>
   </div>
-</div>
+</section>
 {% endblock %}

@@ -127,7 +127,8 @@ def pool() -> ConnectionPool | _PerRequestPool:
     if _pool is None:
         if not settings.database_url:
             raise DatabaseUnavailable(
-                "FORMCRAFT_DATABASE_URL is not set. Point it at your Postgres "
+                "FORMCRAFT_DATABASE_URL or DATABASE_URL is not set. "
+                "Point it at your Postgres "
                 "instance, e.g. postgresql://user:pass@host/dbname?sslmode=require"
             )
         if settings.serverless:

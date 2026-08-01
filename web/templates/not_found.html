@@ -1,4 +1,3 @@
-{% from "components/ui.html" import media %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -10,20 +9,18 @@
   <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
   <link rel="stylesheet" href="{{ static_url('css/components.css') }}">
   <link rel="stylesheet" href="{{ static_url('css/form.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◆</text></svg>">
 </head>
 <body class="public">
-  <main class="form-shell">
-    <div class="done">
-      {{ media("not-found", slots, media_url) }}
-      <h2 class="display">This form isn't available</h2>
-      <p class="lede" style="text-align:center">
-        The link may have been mistyped, or the form may have been closed.
-        Check the link you were sent — and if it still doesn't work, ask
-        whoever shared it for a fresh one.
-      </p>
-    </div>
-    <p class="form-footer">{{ brand_name }}</p>
+  <main class="not-found-shell">
+    <section class="not-found-card">
+      <span class="not-found-code" aria-hidden="true">404</span>
+      <div>
+        <p class="eyebrow">Link unavailable</p>
+        <h1 class="display">This form isn't available</h1>
+      </div>
+      <p class="lede" style="text-align:center">The link may be incomplete, or the form may have been closed. Check the link you received, then ask the sender for a fresh one if needed.</p>
+      <p class="muted small">{{ brand_name }}</p>
+    </section>
   </main>
 </body>
 </html>
