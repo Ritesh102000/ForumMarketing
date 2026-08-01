@@ -64,7 +64,7 @@ npm i -g vercel && vercel login
 vercel --prod
 ```
 
-`vercel.json` and `api/index.py` are already in the repo. The entrypoint forces
+`vercel.json` and the root `index.py` are already in the repo. The entrypoint forces
 `FORMCRAFT_ROLE=public` and **refuses to boot** if you override it to `admin`,
 so the builder cannot be published by accident.
 
