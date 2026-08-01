@@ -1,124 +1,353 @@
-/* The public form — the surface people you send links to actually see. */
+/* The public form — the surface people you send links to actually see.
+ *
+ * Structure: the page background carries the intro (cover, title, who is
+ * asking); each section is a raised card. In one-page mode that turns one long
+ * undifferentiated scroll into a countable stack of steps. In the two stepped
+ * modes only one card is ever visible, so the same rules produce a single
+ * focused panel with no extra markup.
+ */
 
-body.public { background: var(--bg-tint); }
+/* The sticky action bar would otherwise sit on top of whichever field the
+   browser just scrolled into view. */
+html:has(body.public) { scroll-padding-block-end: 7rem; }
+
+body.public {
+  background: var(--bg-tint);
+  /* The sticky action bar sits on this; without it the bar's translucent
+     backdrop reveals whatever is scrolling underneath as a muddy smear. */
+  background-attachment: fixed;
+}
 
 .preview-banner {
   background: var(--warn); color: #1a1206; text-align: center;
-  padding: 9px var(--sp-4); font-size: var(--step--1); font-weight: 580;
+  padding: 9px var(--sp-4); font-size: var(--step--1); font-weight: var(--w-semi);
 }
 
-.progress { height: 3px; background: var(--surface-3); position: sticky; top: 0; z-index: 10; }
+/* Progress -------------------------------------------------------------- */
+
+.progress {
+  height: 3px; background: var(--surface-3);
+  position: sticky; top: 0; z-index: 20;
+}
 .progress-bar {
-  height: 100%; width: 0; border-radius: 0 2px 2px 0;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--highlight)));
-  transition: width .35s var(--ease);
+  height: 100%; width: 0; border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  transition: width .4s var(--ease);
 }
 
-.form-cover { position: relative; }
+/* Cover ----------------------------------------------------------------- */
+
+.form-cover { position: relative; line-height: 0; }
 .form-cover .media, .form-cover .media-ph {
-  width: 100%; height: 180px; border-radius: 0; border-inline: 0; border-top: 0;
+  width: 100%; height: 200px; border-radius: 0; border-inline: 0; border-top: 0;
 }
-.form-cover .media img { height: 180px; object-fit: cover; }
+.form-cover .media img { height: 200px; object-fit: cover; }
 
-.form-shell { max-width: 700px; margin-inline: auto; padding: var(--sp-7) var(--sp-5) var(--sp-8); }
+@media (max-width: 640px) {
+  .form-cover .media, .form-cover .media-ph,
+  .form-cover .media img { height: 132px; }
+}
 
-.form-intro { margin-bottom: var(--sp-6); display: grid; gap: var(--sp-4); }
-.form-intro h1 { font-family: var(--font-display); font-size: var(--step-4); font-weight: 500; }
-.form-intro .lede { font-size: var(--step-1); }
+.form-shell {
+  max-width: 720px; margin-inline: auto;
+  padding: var(--sp-7) var(--sp-5) var(--sp-6);
+}
 
-/* Who is asking --------------------------------------------------------- */
+/* Intro ----------------------------------------------------------------- */
+
+.form-intro {
+  margin-bottom: var(--sp-6);
+  display: grid; gap: var(--sp-5);
+}
+.form-intro h1 {
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: var(--w-bold);
+  letter-spacing: -0.034em;
+  line-height: 1.06;
+}
+.form-intro .lede {
+  font-size: var(--step-1);
+  color: var(--text-2);
+  max-width: 52ch;
+  margin-top: var(--sp-3);
+  text-wrap: pretty;
+}
+
+/* Who is asking. A brand manager decides in seconds whether a real person is
+   on the other end, so this reads as a byline rather than a boxed widget. */
 
 .sender {
   display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border);
 }
-.sender .media, .sender .media-ph { width: 52px; height: 52px; flex: none; aspect-ratio: 1; border-radius: 50%; }
-.sender__name { font-weight: 600; font-size: var(--step-0); }
+.sender .media, .sender .media-ph {
+  width: 44px; height: 44px; flex: none; aspect-ratio: 1; border-radius: 50%;
+}
+.sender .media { box-shadow: 0 0 0 1px var(--border); }
+.sender__name { font-weight: var(--w-semi); font-size: var(--step-0); letter-spacing: -0.01em; }
 .sender__role { font-size: var(--step--1); color: var(--muted); }
 
-.trust { display: grid; gap: var(--sp-3); margin-top: var(--sp-5); }
-.trust .eyebrow { font-size: 0.68rem; }
+/* Sections as cards ----------------------------------------------------- */
 
-/* Steps ----------------------------------------------------------------- */
+.step {
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-6);
+  margin: 0;
+  display: grid; gap: var(--sp-5);
+}
 
-.step { border: 0; padding: 0; margin: 0; display: grid; gap: var(--sp-6); }
-/* One-page mode stacks every section, so they need air between them. In the
-   stepped modes only one is ever visible and this never applies. */
-.step + .step { margin-top: var(--sp-7); }
-.step.enter { animation: rise .34s var(--ease); }
+/* One-page mode stacks every card. In the stepped modes only one sibling is
+   ever without [hidden], so this never matches and no stray gap appears. */
+.step:not([hidden]) + .step:not([hidden]) { margin-top: var(--sp-5); }
+
+@media (max-width: 640px) {
+  .step { padding: var(--sp-5) var(--sp-4); border-radius: var(--r-lg); }
+}
+
+.step.enter { animation: rise .38s var(--ease); }
 @keyframes rise {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
 }
 
-.section-legend { padding: 0; margin-bottom: var(--sp-1); display: grid; gap: 4px; }
-.section-legend h2 { font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; }
-.section-legend p { color: var(--muted); font-size: var(--step-0); }
+/* Legend ---------------------------------------------------------------- */
+/* Browsers lift <legend> out of the fieldset's content box, so it is not a
+   grid item and the fieldset's `gap` does not apply to it. Its own
+   margin-bottom is the only thing that separates it from the first field. */
+
+.section-legend {
+  padding: 0; margin: 0 0 var(--sp-5);
+  display: grid; gap: 5px;
+}
+
+.section-num {
+  font-family: var(--font-mono);
+  font-size: 0.7rem; font-weight: var(--w-bold);
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent);
+}
+.section-legend h2 {
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: var(--w-semi);
+  letter-spacing: -0.024em;
+  line-height: 1.2;
+}
+.section-legend p {
+  color: var(--muted); font-size: var(--step-0); max-width: 56ch;
+  text-wrap: pretty;
+}
 
 /* Fields ---------------------------------------------------------------- */
 
-.field { display: grid; gap: 10px; }
-.field-label { font-weight: 560; font-size: var(--step-1); line-height: 1.35; }
-.field-label > .req { display: inline; color: var(--danger); margin-left: 3px; }
-.field-help { color: var(--muted); font-size: var(--step--1); margin: -4px 0 0; }
-.field.has-error input, .field.has-error select, .field.has-error textarea { border-color: var(--danger); }
-.field-error { color: var(--danger); font-size: var(--step--1); margin: 0; }
+.field { display: grid; gap: 8px; }
 
-.choices { display: grid; gap: 9px; }
+/* The label used to be step-1 semibold — nearly the size of the section
+   title, so nothing established which was the heading. Dropping it a step
+   restores the hierarchy without making it hard to read. */
+.field-label {
+  font-weight: var(--w-semi);
+  font-size: var(--step-0);
+  line-height: 1.4;
+  letter-spacing: -0.008em;
+}
+.field-label > .req { display: inline; color: var(--danger); margin-left: 3px; }
+
+.field-help {
+  color: var(--muted); font-size: var(--step--1);
+  margin: -2px 0 2px; max-width: 60ch; line-height: 1.5;
+}
+
+/* Width follows the answer. A date needs 8 characters, not 600px: a field
+   stretched far past its content invites the wrong answer and reads as
+   sloppy. */
+.field[data-type="short_text"] input,
+.field[data-type="email"] input { max-width: 26rem; }
+.field[data-type="select"] select { max-width: 22rem; }
+.field[data-type="number"] input { max-width: 11rem; }
+.field[data-type="date"] input,
+.field[data-type="time"] input { max-width: 13rem; }
+
+.field.has-error input, .field.has-error select, .field.has-error textarea {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 15%, transparent);
+}
+.field-error {
+  color: var(--danger); font-size: var(--step--1); margin: 0;
+  display: flex; align-items: center; gap: 6px; font-weight: var(--w-medium);
+}
+.field-error::before {
+  content: "!";
+  flex: none; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--danger); color: var(--surface);
+  font-size: 10px; font-weight: var(--w-bold);
+  display: grid; place-items: center;
+}
+
+/* Choices --------------------------------------------------------------- */
+/* Five full-width rows for five short options wasted most of a phone screen
+   and pushed the submit button below three scrolls. Options now flow into
+   columns when they fit, and collapse to one column when they do not. */
+
+.choices {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+.field[data-type="checkbox"] .choices,
+.field[data-type="radio"] .choices { align-items: stretch; }
+
 .choice {
-  display: flex; align-items: center; gap: 11px;
-  padding: 13px 16px; border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md);
   background: var(--surface); cursor: pointer;
-  transition: border-color .16s var(--ease), background .16s var(--ease);
+  font-size: var(--step-0); line-height: 1.35;
+  transition: border-color .16s var(--ease), background .16s var(--ease),
+              box-shadow .16s var(--ease);
 }
 .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong)); }
-.choice input { width: auto; margin: 0; accent-color: var(--accent); }
+.choice input {
+  width: 17px; height: 17px; flex: none; margin: 0; accent-color: var(--accent);
+}
 .choice:has(input:checked) {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: inset 0 0 0 1px var(--accent);
 }
+/* The ring belongs on the row, not the 17px control inside it. */
+.choice:has(input:focus-visible) { box-shadow: var(--ring); }
 
-.scale { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+/* Scale ----------------------------------------------------------------- */
+/* A linear scale is one question, so it reads as one segmented control
+   rather than five loose buttons. */
+
+.scale {
+  display: flex; flex-wrap: nowrap;
+  border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  overflow: hidden; width: max-content; max-width: 100%;
+  background: var(--surface);
+}
+.scale-item { flex: 1 1 auto; min-width: 0; }
 .scale-item input { position: absolute; opacity: 0; pointer-events: none; }
 .scale-item span {
-  display: grid; place-items: center; width: 48px; height: 48px;
-  border: 1px solid var(--border-strong); border-radius: var(--r-md);
-  cursor: pointer; font-weight: 560; background: var(--surface);
-  transition: all .16s var(--ease);
+  display: grid; place-items: center;
+  min-width: 52px; height: 46px; padding-inline: 4px;
+  border: 0; border-left: 1px solid var(--border-strong); border-radius: 0;
+  cursor: pointer; font-weight: var(--w-semi); font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  transition: background .16s var(--ease), color .16s var(--ease);
 }
-.scale-item:hover span { border-color: var(--accent); }
+.scale-item:first-child span { border-left: 0; }
+.scale-item:hover span { background: var(--surface-2); }
 .scale-item:has(input:checked) span {
-  background: var(--accent); border-color: var(--accent); color: #fff;
+  background: var(--accent); color: var(--brand-ink);
+}
+.scale-item:has(input:focus-visible) span { box-shadow: inset var(--ring); }
+
+@media (max-width: 480px) {
+  .scale { width: 100%; }
+  .scale-item span { min-width: 0; }
 }
 
-.rating { display: flex; gap: 5px; }
+/* Rating ---------------------------------------------------------------- */
+
+.rating { display: flex; gap: 4px; }
 .star input { position: absolute; opacity: 0; pointer-events: none; }
 .star span {
-  font-size: 2.1rem; line-height: 1; color: var(--surface-3); cursor: pointer;
+  display: block; padding: 2px;
+  font-size: 1.9rem; line-height: 1;
+  /* surface-3 read as disabled rather than empty-and-waiting. */
+  color: color-mix(in srgb, var(--muted) 38%, transparent);
+  cursor: pointer;
   transition: color .13s var(--ease), transform .13s var(--ease);
 }
 .star.on span, .star:has(input:checked) span { color: var(--highlight); }
-.star:hover span { transform: scale(1.14); }
+.star:hover span { transform: scale(1.12); }
+.star:has(input:focus-visible) span { box-shadow: var(--ring); border-radius: var(--r-sm); }
 
 /* Navigation ------------------------------------------------------------ */
+/* Sticky so the way forward is always on screen. On a long one-page form the
+   submit button was previously three scrolls below the fold. */
 
-.form-nav { display: flex; gap: var(--sp-3); margin-top: var(--sp-7); align-items: center; }
-.form-nav .btn { min-width: 124px; }
-.form-nav .hint { font-size: var(--step--1); color: var(--muted); margin-left: auto; }
-@media (max-width: 560px) { .form-nav .hint { display: none; } }
+.form-nav {
+  position: sticky; bottom: 0; z-index: 15;
+  display: flex; align-items: center; gap: var(--sp-3);
+  /* flex-end keeps the primary action hard right even on the first step,
+     where both Back and the counter are hidden and nothing claims the slack. */
+  justify-content: flex-end;
+  margin-top: var(--sp-6);
+  padding: var(--sp-4) 0 max(var(--sp-4), env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg-tint) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+}
+/* Keeps Back and the counter on the left and the primary action on the right
+   without reordering the DOM, so tab order still follows reading order. */
+.form-nav #back { margin-right: auto; }
+.form-nav #back:not([hidden]) ~ .step-count { margin-right: 0; }
+.form-nav .step-count {
+  margin-right: auto;
+  font-family: var(--font-mono); font-size: var(--step--1);
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.form-nav .btn { min-width: 132px; }
+.form-nav .hint { font-size: var(--step--1); color: var(--muted); }
+.form-nav kbd {
+  font-family: var(--font-mono); font-size: 0.72rem;
+  padding: 2px 5px; border: 1px solid var(--border-strong);
+  border-bottom-width: 2px; border-radius: 5px; background: var(--surface);
+}
+
+@media (max-width: 560px) {
+  .form-nav .hint { display: none; }
+  .form-nav #next, .form-nav #submit { flex: 1; }
+}
+
+/* The pill radius has to be restated: the global :focus-visible rule sets
+   border-radius on whatever it lands on, which square-ended the buttons. */
+body.public .btn:focus-visible { border-radius: var(--r-pill); }
 
 /* Done ------------------------------------------------------------------ */
 
 .done {
-  text-align: center; padding: var(--sp-8) 0; display: grid;
-  gap: var(--sp-4); justify-items: center; animation: rise .4s var(--ease);
+  text-align: center;
+  margin-top: var(--sp-6);
+  padding: var(--sp-8) var(--sp-5);
+  border: 1px solid var(--border); border-radius: var(--r-xl);
+  background: var(--surface); box-shadow: var(--shadow-sm);
+  display: grid; gap: var(--sp-4); justify-items: center;
+  animation: rise .4s var(--ease);
 }
 .done .media, .done .media-ph { width: min(260px, 70%); aspect-ratio: 1; }
-.done h2 { font-family: var(--font-display); font-size: var(--step-3); font-weight: 500; }
+.done h2 {
+  font-family: var(--font-display); font-size: var(--step-3);
+  font-weight: var(--w-semi); letter-spacing: -0.026em;
+  max-width: 34ch; text-wrap: balance;
+}
+.done-check {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+}
+.done-check svg { width: 26px; height: 26px; }
+
+/* Trust ----------------------------------------------------------------- */
+
+.trust {
+  display: grid; gap: var(--sp-3);
+  margin-top: var(--sp-7); justify-items: center;
+}
+.trust .eyebrow { font-size: 0.68rem; }
+.trust .logo-strip { justify-content: center; }
 
 .form-footer {
-  margin-top: var(--sp-8); padding-top: var(--sp-4);
+  margin-top: var(--sp-7); padding-top: var(--sp-4);
   border-top: 1px solid var(--border); text-align: center;
   font-size: var(--step--1); color: var(--muted);
 }

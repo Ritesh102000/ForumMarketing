@@ -9,6 +9,7 @@ const submitBtn = document.getElementById('submit');
 const done = document.getElementById('done');
 const trust = document.getElementById('trust');
 const hint = document.getElementById('hint');
+const stepCount = document.getElementById('stepcount');
 
 const mode = window.FORM_MODE;
 let steps = [];
@@ -45,6 +46,13 @@ function showStep(index) {
   nextBtn.hidden = current >= steps.length - 1;
   submitBtn.hidden = current < steps.length - 1;
   if (hint) hint.hidden = nextBtn.hidden;
+
+  // Telling people how much is left is the cheapest way to stop them
+  // abandoning midway: a bar alone does not say "two more questions".
+  if (stepCount) {
+    stepCount.hidden = false;
+    stepCount.textContent = `${current + 1} / ${steps.length}`;
+  }
 
   progress.style.width = `${((current + 1) / steps.length) * 100}%`;
   window.scrollTo({ top: 0, behavior: 'smooth' });

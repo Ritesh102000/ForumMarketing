@@ -28,9 +28,22 @@
   --warn: #b57516;
 
   /* Type --------------------------------------------------------------- */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Playfair Display", ui-serif, Georgia, "Times New Roman", serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  /* No webfonts are loaded and the no-external-requests rule means none can
+     be. Naming "Inter" and "Playfair Display" here bought nothing: on a
+     machine without them the display stack fell through ui-serif to Times
+     New Roman, which is why headings looked like a word processor. The stacks
+     below are what actually renders, so sizing and tracking can be tuned
+     against real metrics. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Weights. The system stack has no 560/580 — those round unpredictably per
+     platform, so pin the few steps that exist everywhere. */
+  --w-medium: 500;
+  --w-semi: 600;
+  --w-bold: 700;
 
   --step--1: 0.8125rem;
   --step-0: 0.9375rem;

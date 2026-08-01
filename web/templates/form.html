@@ -59,13 +59,23 @@
         {% endif %}
       </header>
 
+      {# A <section> rather than a <fieldset>: browsers lift a <legend> out of
+         the fieldset's background box, so a styled card renders with its
+         heading floating above it and no override fixes it. role=group plus
+         aria-labelledby gives the same grouping to assistive tech. #}
       {% for section in form.sections %}
-      <fieldset class="step" data-step data-section="{{ loop.index0 }}">
+      <section class="step" data-step data-section="{{ loop.index0 }}"
+               {% if section.title %}role="group" aria-labelledby="sec-{{ loop.index0 }}"{% endif %}>
         {% if section.title or section.description %}
-        <legend class="section-legend">
-          {% if section.title %}<h2>{{ section.title }}</h2>{% endif %}
+        <div class="section-legend">
+          {# Numbered only when there is more than one, so a single-section form
+             does not get a pointless "01 / 01". #}
+          {% if form.sections | length > 1 %}
+          <span class="section-num">{{ "%02d" | format(loop.index) }} / {{ "%02d" | format(form.sections | length) }}</span>
+          {% endif %}
+          {% if section.title %}<h2 id="sec-{{ loop.index0 }}">{{ section.title }}</h2>{% endif %}
           {% if section.description %}<p>{{ section.description }}</p>{% endif %}
-        </legend>
+        </div>
         {% endif %}
 
         {% for q in section.questions %}
@@ -126,15 +136,21 @@
 
       <div class="form-nav">
         <button type="button" class="btn btn-ghost" id="back" hidden>Back</button>
+        <span class="step-count" id="stepcount" aria-live="polite" hidden></span>
+        <span class="hint" id="hint" hidden>press <kbd>Enter</kbd></span>
         <button type="button" class="btn btn-primary btn-lg" id="next" hidden>Continue</button>
         <button type="submit" class="btn btn-primary btn-lg" id="submit">Submit</button>
-        <span class="hint" id="hint" hidden>press <kbd>Enter</kbd></span>
       </div>
     </form>
 
     <div class="done" id="done" hidden>
       {% if media_url("form-success") %}
       {{ media("form-success", slots, media_url) }}
+      {% else %}
+      <span class="done-check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
       {% endif %}
       <h2 id="done-msg">{{ form.confirm_msg }}</h2>
       <button class="btn btn-ghost" id="again">Submit another response</button>
