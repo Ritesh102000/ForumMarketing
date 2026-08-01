@@ -115,13 +115,12 @@ body.public {
   to { opacity: 1; transform: none; }
 }
 
-/* Legend ---------------------------------------------------------------- */
-/* Browsers lift <legend> out of the fieldset's content box, so it is not a
-   grid item and the fieldset's `gap` does not apply to it. Its own
-   margin-bottom is the only thing that separates it from the first field. */
+/* Section heading ------------------------------------------------------- */
+/* A plain div, so the card's own `gap` spaces it from the first field — any
+   margin here would stack on top of that gap and double the distance. */
 
 .section-legend {
-  padding: 0; margin: 0 0 var(--sp-5);
+  padding: 0; margin: 0;
   display: grid; gap: 5px;
 }
 
@@ -282,9 +281,18 @@ body.public {
   justify-content: flex-end;
   margin-top: var(--sp-6);
   padding: var(--sp-4) 0 max(var(--sp-4), env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--bg-tint) 92%, transparent);
+}
+/* The bar's controls stay aligned to the 720px column, but its backdrop has to
+   run the full width of the window — clipped to the column it read as a
+   floating grey slab with two hard vertical seams. */
+.form-nav::before {
+  content: "";
+  position: absolute; inset: 0;
+  left: 50%; width: 100vw; transform: translateX(-50%);
+  background: color-mix(in srgb, var(--bg-tint) 88%, transparent);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
+  z-index: -1;
 }
 /* Keeps Back and the counter on the left and the primary action on the right
    without reordering the DOM, so tab order still follows reading order. */
