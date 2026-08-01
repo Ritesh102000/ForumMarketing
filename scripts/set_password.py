@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import getpass
+import os
 import re
 import secrets
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+# When the checkout is linked to Vercel, its marketplace integrations are
+# pulled here. Import only the standard DATABASE_URL into the local admin .env;
+# the remaining Vercel variables belong to the deployed public service.
+load_dotenv(ROOT / ".env.local", override=False)
 
 from formcraft.auth import hash_password  # noqa: E402
 
-ROOT = Path(__file__).resolve().parents[1]
 ENV = ROOT / ".env"
 EXAMPLE = ROOT / ".env.example"
 
@@ -34,6 +42,11 @@ def main() -> int:
         print("Created .env from .env.example")
 
     text = ENV.read_text()
+
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if database_url:
+        text = upsert(text, "FORMCRAFT_DATABASE_URL", database_url)
+        print("Connected the local admin to the Vercel Postgres database.")
 
     username = input("Admin username [admin]: ").strip() or "admin"
     password = getpass.getpass("Admin password: ")
