@@ -90,6 +90,11 @@ input[type="color"] { width: 52px; height: 40px; padding: 3px; border: 1px solid
 .alert { padding: 12px 14px; border: 1px solid transparent; border-radius: var(--r-sm); font-size: var(--step--1); }
 .alert-error { border-color: #f6cbc7; background: #fff4f2; color: var(--danger); }
 .alert-warn { border-color: #f1d4b0; background: #fffaeb; color: var(--warn); }
+.alert-success { border-color: #bcdccc; background: #f0faf4; color: var(--ok); }
+.alert strong { display: block; margin-bottom: 3px; }
+.alert ul { margin: 8px 0 0; padding-left: 20px; }
+.alert li + li { margin-top: 3px; }
+.is-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgb(190 52 43 / 10%) !important; }
 
 /* Brand */
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); font-weight: 700; }

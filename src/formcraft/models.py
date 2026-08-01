@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 DisplayMode = Literal["single", "section", "one_by_one"]
 
@@ -25,16 +26,28 @@ QUESTION_TYPES: dict[str, dict[str, Any]] = {
 MULTI_VALUE_TYPES = {"checkbox"}
 
 
-class QuestionIn(BaseModel):
-    id: str | None = None
-    section_id: str | None = None
+class InputModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class QuestionIn(InputModel):
+    id: str | None = Field(default=None, max_length=100)
+    section_id: str | None = Field(default=None, max_length=100)
     type: str
     label: str = Field(min_length=1, max_length=500)
-    help_text: str = ""
-    placeholder: str = ""
+    help_text: str = Field(default="", max_length=2000)
+    placeholder: str = Field(default="", max_length=500)
     required: bool = False
-    options: list[str] = Field(default_factory=list)
+    options: list[str] = Field(default_factory=list, max_length=200)
     config: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("label")
+    @classmethod
+    def clean_label(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("question name cannot be empty")
+        return value
 
     @field_validator("type")
     @classmethod
@@ -46,32 +59,122 @@ class QuestionIn(BaseModel):
     @field_validator("options")
     @classmethod
     def clean_options(cls, value: list[str]) -> list[str]:
-        return [item.strip() for item in value if item.strip()]
+        cleaned = [item.strip() for item in value if item.strip()]
+        if any(len(item) > 500 for item in cleaned):
+            raise ValueError("option names must be 500 characters or fewer")
+        return cleaned
+
+    @model_validator(mode="after")
+    def valid_configuration(self) -> QuestionIn:
+        if self.type in {"select", "radio", "checkbox"}:
+            if len(self.options) < 2:
+                raise ValueError("choice questions need at least two options")
+            normalized = [option.casefold() for option in self.options]
+            if len(normalized) != len(set(normalized)):
+                raise ValueError("option names must be unique within a question")
+
+        if self.type in {"number", "scale", "rating"}:
+            minimum = self.config.get("min")
+            maximum = self.config.get("max")
+            if self.type in {"scale", "rating"}:
+                minimum = 1 if minimum is None else minimum
+                maximum = 5 if maximum is None else maximum
+                self.config = {**self.config, "min": minimum, "max": maximum}
+            elif minimum is None and maximum is None:
+                return self
+            try:
+                parsed_min = float(minimum) if minimum is not None else None
+                parsed_max = float(maximum) if maximum is not None else None
+            except (TypeError, ValueError) as exc:
+                raise ValueError("minimum and maximum must be numbers") from exc
+            bounds = [bound for bound in (parsed_min, parsed_max) if bound is not None]
+            if not all(math.isfinite(bound) for bound in bounds):
+                raise ValueError("minimum and maximum must be finite numbers")
+            if (
+                parsed_min is not None
+                and parsed_max is not None
+                and parsed_min >= parsed_max
+            ):
+                raise ValueError("maximum must be greater than minimum")
+        return self
 
 
-class SectionIn(BaseModel):
-    id: str | None = None
-    title: str = ""
-    description: str = ""
-    questions: list[QuestionIn] = Field(default_factory=list)
+class SectionIn(InputModel):
+    id: str | None = Field(default=None, max_length=100)
+    title: str = Field(default="", max_length=300)
+    description: str = Field(default="", max_length=2000)
+    questions: list[QuestionIn] = Field(default_factory=list, max_length=200)
 
 
-class FormIn(BaseModel):
+class FormIn(InputModel):
     title: str = Field(min_length=1, max_length=300)
-    description: str = ""
+    description: str = Field(default="", max_length=5000)
     display_mode: DisplayMode = "single"
     accent: str = "#6366f1"
     is_published: bool = False
-    confirm_msg: str = "Thanks — your response has been recorded."
-    sections: list[SectionIn] = Field(default_factory=list)
+    confirm_msg: str = Field(
+        default="Thanks — your response has been recorded.", max_length=1000
+    )
+    sections: list[SectionIn] = Field(default_factory=list, max_length=50)
+
+    @field_validator("title")
+    @classmethod
+    def clean_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("form name cannot be empty")
+        return value
+
+    @field_validator("confirm_msg")
+    @classmethod
+    def clean_confirmation(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("confirmation message cannot be empty")
+        return value
 
     @field_validator("accent")
     @classmethod
     def valid_hex(cls, value: str) -> str:
         value = value.strip()
-        if not value.startswith("#") or len(value) not in (4, 7):
+        digits = value[1:] if value.startswith("#") else ""
+        if len(digits) not in (3, 6) or any(
+            c not in "0123456789abcdefABCDEF" for c in digits
+        ):
             raise ValueError("accent must be a hex colour like #6366f1")
         return value
+
+    @model_validator(mode="after")
+    def valid_structure(self) -> FormIn:
+        if not self.sections:
+            raise ValueError("add at least one section")
+
+        questions = [q for section in self.sections for q in section.questions]
+        if not questions:
+            raise ValueError("add at least one question")
+        if len(questions) > 500:
+            raise ValueError("a form can contain at most 500 questions")
+        for index, section in enumerate(self.sections, start=1):
+            if not section.questions:
+                raise ValueError(f"section {index} needs at least one question")
+
+        question_names = [q.label.casefold() for q in questions]
+        if len(question_names) != len(set(question_names)):
+            raise ValueError("question names must be unique within a form")
+
+        section_names = [
+            s.title.strip().casefold() for s in self.sections if s.title.strip()
+        ]
+        if len(section_names) != len(set(section_names)):
+            raise ValueError("section names must be unique within a form")
+
+        question_ids = [q.id for q in questions if q.id]
+        if len(question_ids) != len(set(question_ids)):
+            raise ValueError("the form contains a duplicated question reference")
+        section_ids = [section.id for section in self.sections if section.id]
+        if len(section_ids) != len(set(section_ids)):
+            raise ValueError("the form contains a duplicated section reference")
+        return self
 
 
 def validate_answer(question: dict[str, Any], raw: Any) -> tuple[Any, str | None]:

@@ -84,6 +84,7 @@
 .share input { min-height: 36px; padding: 7px 10px; border-color: var(--border); background: var(--surface); color: var(--muted); font-size: .76rem; }
 
 /* Builder */
+.builder-feedback { margin-bottom: var(--sp-4); }
 .builder-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
 .settings { position: sticky; top: 24px; display: grid; gap: var(--sp-4); padding: 20px; }
 .settings h3 { padding-bottom: 12px; border-bottom: 1px solid var(--border); color: var(--text-2); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }

@@ -90,11 +90,12 @@ def test_create_and_read_form():
     assert form["questions"][3]["config"] == {"min": 1, "max": 5}
 
 
-def test_slug_is_unique():
-    first = repository.create_form(FormIn.model_validate(sample_form()))
-    second = repository.create_form(FormIn.model_validate(sample_form()))
-    assert repository.get_form(form_id=first)["slug"] == "creator-intake"
-    assert repository.get_form(form_id=second)["slug"] == "creator-intake-2"
+def test_duplicate_form_title_is_rejected_case_insensitively():
+    repository.create_form(FormIn.model_validate(sample_form()))
+    duplicate = sample_form(title="  CREATOR INTAKE  ")
+
+    with pytest.raises(repository.DuplicateFormTitleError):
+        repository.create_form(FormIn.model_validate(duplicate))
 
 
 def test_update_keeps_question_ids_and_archives_removals():
@@ -166,6 +167,52 @@ def test_admin_requires_login(admin_client):
     anon = TestClient(admin_client.app)
     assert anon.get("/", follow_redirects=False).headers["location"] == "/login"
     assert anon.post("/api/forms", json={"title": "x"}).status_code == 401
+
+
+def test_duplicate_form_title_returns_clear_conflict(admin_client):
+    first = admin_client.post("/api/forms", json=sample_form())
+    assert first.status_code == 201
+
+    duplicate = admin_client.post(
+        "/api/forms", json=sample_form(title=" creator INTAKE ")
+    )
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["code"] == "duplicate_form_name"
+    assert "already exists" in duplicate.json()["detail"]["message"]
+
+
+def test_invalid_form_payload_returns_actionable_errors(admin_client):
+    payload = sample_form()
+    payload["sections"][0]["questions"][2]["options"] = ["IG", "ig"]
+
+    response = admin_client.post("/api/forms", json=payload)
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["code"] == "validation_error"
+    messages = " ".join(item["message"] for item in detail["errors"])
+    assert "option names must be unique" in messages
+
+    payload = sample_form()
+    payload["sections"][0]["questions"][1]["label"] = "Handle"
+    response = admin_client.post("/api/forms", json=payload)
+    messages = " ".join(
+        item["message"] for item in response.json()["detail"]["errors"]
+    )
+    assert response.status_code == 422
+    assert "question names must be unique" in messages
+
+
+def test_malformed_json_is_not_an_internal_server_error(admin_client):
+    response = admin_client.post(
+        "/api/forms",
+        content=b'{"title":',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "invalid_json"
 
 
 def test_wrong_password_rejected(admin_client):
@@ -277,6 +324,30 @@ def test_direct_sheet_sync_creates_appends_and_updates_headers(
     assert updated.status_code == 200
     assert updated.json()["sheet"]["updated"] is True
     assert ("update", form_id, "Renamed intake") in calls
+
+
+def test_sheet_creation_failure_keeps_form_and_returns_safe_guidance(
+    monkeypatch, admin_client
+):
+    from formcraft import sheets
+
+    patch_settings(monkeypatch, google_enabled=True)
+
+    def fail_create(form):
+        raise RuntimeError("429 quota exceeded sensitive-marker=never-show")
+
+    monkeypatch.setattr(sheets, "create_spreadsheet", fail_create)
+
+    created = admin_client.post("/api/forms", json=sample_form())
+
+    assert created.status_code == 201
+    form_id = created.json()["id"]
+    assert repository.get_form(form_id=form_id) is not None
+    sheet = created.json()["sheet"]
+    assert sheet["status"] == "error"
+    assert "request limit" in sheet["detail"]
+    assert "sensitive-marker" not in sheet["detail"]
+    assert repository.get_form(form_id=form_id)["sheet_error"] == sheet["detail"]
 
 
 def test_draft_is_hidden_from_the_public(admin_client):

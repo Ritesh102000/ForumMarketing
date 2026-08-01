@@ -99,6 +99,50 @@ def test_options_are_trimmed_and_blanks_dropped():
     assert form.sections[0].questions[0].options == ["A", "B"]
 
 
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"sections": []}, "add at least one section"),
+        (
+            {"sections": [{"questions": []}]},
+            "add at least one question",
+        ),
+        (
+            {
+                "sections": [
+                    {
+                        "questions": [
+                            {"type": "radio", "label": "Pick", "options": ["Only"]}
+                        ]
+                    }
+                ]
+            },
+            "at least two options",
+        ),
+        (
+            {
+                "sections": [
+                    {
+                        "questions": [
+                            {
+                                "type": "scale",
+                                "label": "Score",
+                                "config": {"min": 5, "max": 1},
+                            }
+                        ]
+                    }
+                ]
+            },
+            "maximum must be greater",
+        ),
+    ],
+)
+def test_form_structure_errors_are_rejected(change, message):
+    payload = {"title": "Validation test", **change}
+    with pytest.raises(ValueError, match=message):
+        FormIn.model_validate(payload)
+
+
 # ------------------------------------------------------------- image slots
 
 

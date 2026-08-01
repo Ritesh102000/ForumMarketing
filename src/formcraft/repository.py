@@ -15,6 +15,14 @@ from .db import readonly, transaction
 from .models import FormIn
 
 
+class DuplicateFormTitleError(ValueError):
+    """A form already uses the same human-facing title."""
+
+
+class InvalidFormReferenceError(ValueError):
+    """An edit tried to reuse structure owned by a different form."""
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -148,33 +156,45 @@ def form_by_export_key(form_id: str, key: str) -> dict[str, Any] | None:
 
 
 def create_form(payload: FormIn) -> str:
+    if any(section.id for section in payload.sections) or any(
+        question.id for section in payload.sections for question in section.questions
+    ):
+        raise InvalidFormReferenceError("A new form cannot reuse saved structure.")
     form_id = _new_id()
     now = _now()
-    with transaction() as conn:
-        slug = unique_slug(conn, payload.title)
-        # Readable prefix for humans, random suffix so it cannot be guessed.
-        # Never regenerated — renaming a form must not break shared links.
-        public_ref = f"{slug}-{secrets.token_urlsafe(9)}"
-        conn.execute(
-            """INSERT INTO forms
-               (id, slug, public_ref, title, description, display_mode, accent,
-                is_published, confirm_msg, created_at, updated_at)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (
-                form_id,
-                slug,
-                public_ref,
-                payload.title,
-                payload.description,
-                payload.display_mode,
-                payload.accent,
-                payload.is_published,
-                payload.confirm_msg,
-                now,
-                now,
-            ),
-        )
-        _write_structure(conn, form_id, payload)
+    try:
+        with transaction() as conn:
+            _ensure_unique_title(conn, payload.title)
+            slug = unique_slug(conn, payload.title)
+            # Readable prefix for humans, random suffix so it cannot be guessed.
+            # Never regenerated — renaming a form must not break shared links.
+            public_ref = f"{slug}-{secrets.token_urlsafe(9)}"
+            conn.execute(
+                """INSERT INTO forms
+                   (id, slug, public_ref, title, description, display_mode, accent,
+                    is_published, confirm_msg, created_at, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                (
+                    form_id,
+                    slug,
+                    public_ref,
+                    payload.title,
+                    payload.description,
+                    payload.display_mode,
+                    payload.accent,
+                    payload.is_published,
+                    payload.confirm_msg,
+                    now,
+                    now,
+                ),
+            )
+            _write_structure(conn, form_id, payload)
+    except psycopg.errors.UniqueViolation as exc:
+        if exc.diag.constraint_name == "idx_forms_title_normalized":
+            raise DuplicateFormTitleError(payload.title) from exc
+        raise InvalidFormReferenceError(
+            "The form contains a conflicting reference."
+        ) from exc
     return form_id
 
 
@@ -185,39 +205,92 @@ def update_form(form_id: str, payload: FormIn) -> None:
     responses and spreadsheet columns stay attached. Questions that disappear
     are archived rather than deleted.
     """
-    with transaction() as conn:
-        existing = conn.execute(
-            "SELECT id FROM forms WHERE id = %s", (form_id,)
-        ).fetchone()
-        if existing is None:
-            raise KeyError(form_id)
+    try:
+        with transaction() as conn:
+            existing = conn.execute(
+                "SELECT id FROM forms WHERE id = %s", (form_id,)
+            ).fetchone()
+            if existing is None:
+                raise KeyError(form_id)
 
-        slug = unique_slug(conn, payload.title, exclude_id=form_id)
-        conn.execute(
-            """UPDATE forms
-                  SET slug = %s, title = %s, description = %s, display_mode = %s,
-                      accent = %s, is_published = %s, confirm_msg = %s,
-                      updated_at = %s
-                WHERE id = %s""",
-            (
-                slug,
-                payload.title,
-                payload.description,
-                payload.display_mode,
-                payload.accent,
-                payload.is_published,
-                payload.confirm_msg,
-                _now(),
-                form_id,
-            ),
-        )
+            _ensure_unique_title(conn, payload.title, exclude_id=form_id)
+            kept = {
+                q.id for section in payload.sections for q in section.questions if q.id
+            }
+            section_ids = {section.id for section in payload.sections if section.id}
+            _ensure_owned_structure(conn, form_id, kept, section_ids)
 
-        kept = {q.id for section in payload.sections for q in section.questions if q.id}
-        conn.execute(
-            "UPDATE questions SET archived = TRUE WHERE form_id = %s", (form_id,)
-        )
-        conn.execute("DELETE FROM sections WHERE form_id = %s", (form_id,))
-        _write_structure(conn, form_id, payload, reuse_ids=kept)
+            slug = unique_slug(conn, payload.title, exclude_id=form_id)
+            conn.execute(
+                """UPDATE forms
+                      SET slug = %s, title = %s, description = %s,
+                          display_mode = %s, accent = %s, is_published = %s,
+                          confirm_msg = %s, updated_at = %s
+                    WHERE id = %s""",
+                (
+                    slug,
+                    payload.title,
+                    payload.description,
+                    payload.display_mode,
+                    payload.accent,
+                    payload.is_published,
+                    payload.confirm_msg,
+                    _now(),
+                    form_id,
+                ),
+            )
+
+            conn.execute(
+                "UPDATE questions SET archived = TRUE WHERE form_id = %s", (form_id,)
+            )
+            conn.execute("DELETE FROM sections WHERE form_id = %s", (form_id,))
+            _write_structure(conn, form_id, payload, reuse_ids=kept)
+    except psycopg.errors.UniqueViolation as exc:
+        if exc.diag.constraint_name == "idx_forms_title_normalized":
+            raise DuplicateFormTitleError(payload.title) from exc
+        raise InvalidFormReferenceError(
+            "The form contains a conflicting reference."
+        ) from exc
+
+
+def _ensure_unique_title(
+    conn: psycopg.Connection, title: str, exclude_id: str = ""
+) -> None:
+    row = conn.execute(
+        """SELECT id FROM forms
+            WHERE lower(btrim(title)) = lower(btrim(%s)) AND id <> %s""",
+        (title, exclude_id),
+    ).fetchone()
+    if row is not None:
+        raise DuplicateFormTitleError(title)
+
+
+def _ensure_owned_structure(
+    conn: psycopg.Connection,
+    form_id: str,
+    question_ids: set[str],
+    section_ids: set[str],
+) -> None:
+    if question_ids:
+        owned = {
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM questions WHERE form_id = %s AND id = ANY(%s)",
+                (form_id, list(question_ids)),
+            ).fetchall()
+        }
+        if owned != question_ids:
+            raise InvalidFormReferenceError("A question does not belong to this form.")
+    if section_ids:
+        owned = {
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM sections WHERE form_id = %s AND id = ANY(%s)",
+                (form_id, list(section_ids)),
+            ).fetchall()
+        }
+        if owned != section_ids:
+            raise InvalidFormReferenceError("A section does not belong to this form.")
 
 
 def _write_structure(
@@ -254,8 +327,8 @@ def _write_structure(
                           SET type = %s, label = %s, help_text = %s, placeholder = %s,
                               required = %s, options = %s, config = %s, position = %s,
                               section_id = %s, archived = FALSE
-                        WHERE id = %s""",
-                    (*values, question.id),
+                        WHERE id = %s AND form_id = %s""",
+                    (*values, question.id, form_id),
                 )
             else:
                 conn.execute(

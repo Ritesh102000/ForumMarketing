@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import (
     HTMLResponse,
@@ -257,21 +258,28 @@ def _register_admin(app: FastAPI) -> None:  # noqa: C901 - route table, flat by 
 
     @app.post("/api/forms", dependencies=[local, admin])
     async def api_create(request: Request) -> JSONResponse:
-        payload = _parse_form(await request.json())
-        form_id = repository.create_form(payload)
-        sheet = _attach_sheet(form_id)
+        payload = await _read_form(request)
+        try:
+            form_id = repository.create_form(payload)
+        except Exception as exc:  # converted into a safe, useful API response
+            _raise_form_write_error(exc, action="created")
+        sheet = _sheet_after_save(form_id, create=True)
         return JSONResponse(
             {"id": form_id, "sheet": sheet}, status_code=status.HTTP_201_CREATED
         )
 
     @app.put("/api/forms/{form_id}", dependencies=[local, admin])
     async def api_update(form_id: str, request: Request) -> JSONResponse:
-        payload = _parse_form(await request.json())
+        payload = await _read_form(request)
         try:
             repository.update_form(form_id, payload)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Form not found") from exc
-        return JSONResponse({"id": form_id, "sheet": _sync_sheet(form_id)})
+        except Exception as exc:  # converted into a safe, useful API response
+            _raise_form_write_error(exc, action="updated")
+        return JSONResponse(
+            {"id": form_id, "sheet": _sheet_after_save(form_id, create=False)}
+        )
 
     @app.delete("/api/forms/{form_id}", dependencies=[local, admin])
     def api_delete(form_id: str) -> JSONResponse:
@@ -391,11 +399,99 @@ def _file_response(body: bytes, media_type: str, name: str) -> RawResponse:
     )
 
 
+async def _read_form(request: Request) -> FormIn:
+    try:
+        raw = await request.json()
+    except Exception as exc:  # Starlette may surface several decoder exceptions
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "invalid_json",
+                "message": "The form data could not be read. Refresh and try again.",
+            },
+        ) from exc
+    return _parse_form(raw)
+
+
 def _parse_form(raw: Any) -> FormIn:
     try:
         return FormIn.model_validate(raw)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+        errors = []
+        for item in exc.errors(include_url=False, include_context=False):
+            message = item["msg"].removeprefix("Value error, ")
+            errors.append(
+                {
+                    "field": ".".join(str(part) for part in item["loc"]) or "form",
+                    "message": message,
+                }
+            )
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "validation_error",
+                "message": "Please fix the form before saving.",
+                "errors": errors,
+            },
+        ) from exc
+
+
+def _raise_form_write_error(exc: Exception, action: str) -> None:
+    if isinstance(exc, repository.DuplicateFormTitleError):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "duplicate_form_name",
+                "message": (
+                    "A form with this name already exists. Choose a different name."
+                ),
+                "field": "title",
+            },
+        ) from exc
+    if isinstance(exc, repository.InvalidFormReferenceError):
+        log.warning("rejected invalid form structure reference: %s", exc)
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_structure",
+                "message": (
+                    "This form changed unexpectedly. Refresh it before saving again."
+                ),
+            },
+        ) from exc
+    if isinstance(exc, (psycopg.OperationalError, db.DatabaseUnavailable)):
+        log.exception("database unavailable while form was being %s", action)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "database_unavailable",
+                "message": (
+                    "The database is temporarily unavailable, so the form was not "
+                    f"{action}. "
+                    "Wait a moment and try again."
+                ),
+            },
+        ) from exc
+    if isinstance(exc, psycopg.IntegrityError):
+        log.exception("database rejected form while it was being %s", action)
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "save_conflict",
+                "message": "The form conflicts with saved data. Refresh and try again.",
+            },
+        ) from exc
+    log.exception("unexpected error while form was being %s", action)
+    raise HTTPException(
+        status_code=500,
+        detail={
+            "code": "save_failed",
+            "message": (
+                f"The form could not be {action}. "
+                "Your changes are still on this page."
+            ),
+        },
+    ) from exc
 
 
 def _editor_payload(form: dict[str, Any]) -> dict[str, Any]:
@@ -436,6 +532,23 @@ def _editor_payload(form: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _sheet_after_save(form_id: str, create: bool) -> dict[str, Any]:
+    """A Sheet outage must never turn a successful form save into a 500."""
+    try:
+        return _attach_sheet(form_id) if create else _sync_sheet(form_id)
+    except Exception:  # noqa: BLE001 - form durability takes priority
+        log.exception("sheet follow-up failed after form %s was saved", form_id)
+        key = "created" if create else "updated"
+        return {
+            key: False,
+            "status": "error",
+            "detail": (
+                "The form is saved. Google Sheets could not be reached; "
+                "retry sync from Responses."
+            ),
+        }
+
+
 def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
     """Create the spreadsheet for a form. Never fatal — the form still works."""
     if not sheets.enabled():
@@ -452,15 +565,31 @@ def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
     try:
         sheet_id, sheet_url = sheets.create_spreadsheet(form)
     except Exception as exc:  # noqa: BLE001
-        detail = f"{type(exc).__name__}: {exc}"
+        technical_detail = f"{type(exc).__name__}: {exc}"
+        detail = _sheet_failure_message(exc, "created")
         repository.set_sheet(form_id, "", "", error=detail)
-        log.warning("sheet creation failed for %s: %s", form_id, detail)
-        return {"created": False, "detail": detail}
+        log.warning("sheet creation failed for %s: %s", form_id, technical_detail)
+        return {"created": False, "status": "error", "detail": detail}
 
-    repository.set_sheet(form_id, sheet_id, sheet_url)
+    try:
+        repository.set_sheet(form_id, sheet_id, sheet_url)
+    except Exception:  # the Google file exists; never hide its URL
+        log.exception("sheet %s was created but could not be linked", sheet_id)
+        return {
+            "created": True,
+            "linked": False,
+            "status": "error",
+            "url": sheet_url,
+            "detail": (
+                "The Google Sheet was created, but the app could not save its link. "
+                "Keep this Sheet URL and retry linking after the database recovers."
+            ),
+        }
     backfill = retry_pending(form_id=form_id)
     return {
         "created": True,
+        "linked": True,
+        "status": "ok",
         "url": sheet_url,
         "backfilled": backfill["synced"],
         "detail": "Spreadsheet created and existing responses synchronized.",
@@ -482,13 +611,44 @@ def _sync_sheet(form_id: str) -> dict[str, Any]:
     try:
         sheets.sync_spreadsheet(form)
     except Exception as exc:  # noqa: BLE001 - the form edit is already durable
-        detail = f"{type(exc).__name__}: {exc}"
+        technical_detail = f"{type(exc).__name__}: {exc}"
+        detail = _sheet_failure_message(exc, "updated")
         repository.set_sheet_error(form_id, detail)
-        log.warning("sheet update failed for %s: %s", form_id, detail)
-        return {"updated": False, "detail": detail}
+        log.warning("sheet update failed for %s: %s", form_id, technical_detail)
+        return {"updated": False, "status": "error", "detail": detail}
 
     repository.set_sheet_error(form_id)
-    return {"updated": True, "url": form["sheet_url"], "detail": "Sheet updated."}
+    return {
+        "updated": True,
+        "status": "ok",
+        "url": form["sheet_url"],
+        "detail": "Sheet updated.",
+    }
+
+
+def _sheet_failure_message(exc: Exception, action: str) -> str:
+    """Turn provider/network failures into safe, actionable admin copy."""
+    detail = str(exc).casefold()
+    saved = "The form is saved. "
+    if "invalid_grant" in detail or "token has been expired" in detail:
+        return saved + "Google authorization expired. Reconnect Google and retry sync."
+    if "403" in detail or "permission" in detail or "forbidden" in detail:
+        return saved + "Google denied access. Check the account permissions and retry."
+    if "404" in detail or "not found" in detail:
+        return (
+            saved + "The linked Google Sheet was not found. It may have been deleted."
+        )
+    if "429" in detail or "quota" in detail or "rate limit" in detail:
+        return (
+            saved
+            + "Google's request limit was reached. Wait briefly and retry sync."
+        )
+    if "timeout" in detail or "timed out" in detail or "connection" in detail:
+        return (
+            saved
+            + "Google Sheets could not be reached. Check the connection and retry."
+        )
+    return saved + f"The Google Sheet could not be {action}. Retry sync from Responses."
 
 
 def retry_pending(form_id: str = "") -> dict[str, Any]:

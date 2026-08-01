@@ -84,6 +84,11 @@ ALTER TABLE forms ADD COLUMN IF NOT EXISTS export_key TEXT;
 -- shared link keeps working even after the form is renamed.
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS public_ref TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_forms_public_ref ON forms(public_ref);
+-- Form names are admin-facing identifiers as well as Google Sheet titles.
+-- Treat case and surrounding whitespace as equivalent so "Survey" cannot be
+-- recreated as " survey ", including during concurrent requests.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_forms_title_normalized
+    ON forms ((lower(btrim(title))));
 
 CREATE INDEX IF NOT EXISTS idx_sections_form ON sections(form_id, position);
 CREATE INDEX IF NOT EXISTS idx_questions_form ON questions(form_id, position);

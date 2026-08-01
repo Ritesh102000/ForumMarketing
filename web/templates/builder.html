@@ -22,11 +22,18 @@
   </div>
 </div>
 
+<div id="builder-feedback"
+     class="alert {{ 'alert-error' if form and form.sheet_error else '' }} builder-feedback"
+     role="alert"
+     {% if not form or not form.sheet_error %}hidden{% endif %}>
+  {% if form and form.sheet_error %}<strong>Google Sheets needs attention.</strong> {{ form.sheet_error }}{% endif %}
+</div>
+
 <div class="builder-grid">
   <aside class="card settings">
     <h3>Form settings</h3>
-    <label class="field-row"><span>Title</span><input id="f-title" type="text" placeholder="Untitled form"></label>
-    <label class="field-row"><span>Description</span><textarea id="f-description" rows="3" placeholder="Shown under the title, above the questions"></textarea></label>
+    <label class="field-row"><span>Title</span><input id="f-title" type="text" maxlength="300" placeholder="Untitled form"></label>
+    <label class="field-row"><span>Description</span><textarea id="f-description" rows="3" maxlength="5000" placeholder="Shown under the title, above the questions"></textarea></label>
 
     <fieldset class="modes">
       <legend>Layout</legend>
@@ -36,7 +43,7 @@
     </fieldset>
 
     <label class="field-row"><span>Accent colour</span><input id="f-accent" type="color" value="#4f46e5"></label>
-    <label class="field-row"><span>Confirmation message</span><textarea id="f-confirm" rows="2"></textarea></label>
+    <label class="field-row"><span>Confirmation message</span><textarea id="f-confirm" rows="2" maxlength="1000"></textarea></label>
     <label class="toggle">
       <input id="f-published" type="checkbox">
       <span><strong>Published</strong><em>Drafts are visible only to you</em></span>
@@ -59,14 +66,14 @@
 <template id="tpl-section">
   <section class="card section-block">
     <header class="section-head">
-      <input class="s-title" type="text" placeholder="Section title">
+      <input class="s-title" type="text" maxlength="300" placeholder="Section title">
       <div class="row-actions">
         <button class="icon-btn" data-act="up" title="Move up">↑</button>
         <button class="icon-btn" data-act="down" title="Move down">↓</button>
         <button class="icon-btn danger" data-act="del" title="Delete section">✕</button>
       </div>
     </header>
-    <input class="s-desc" type="text" placeholder="Section description (optional)">
+    <input class="s-desc" type="text" maxlength="2000" placeholder="Section description (optional)">
     <div class="questions"></div>
     <button class="btn btn-dashed" data-act="add-q">+ Add question</button>
   </section>
@@ -75,7 +82,7 @@
 <template id="tpl-question">
   <div class="question">
     <div class="q-main">
-      <input class="q-label" type="text" placeholder="Question">
+      <input class="q-label" type="text" maxlength="500" placeholder="Question">
       <select class="q-type">
         {% for key, meta in question_types.items() %}
         <option value="{{ key }}">{{ meta.label }}</option>
@@ -87,7 +94,7 @@
         <button class="icon-btn danger" data-act="del" title="Delete question">✕</button>
       </div>
     </div>
-    <input class="q-help" type="text" placeholder="Helper text (optional)">
+    <input class="q-help" type="text" maxlength="2000" placeholder="Helper text (optional)">
     <div class="q-options hidden">
       <div class="opt-list"></div>
       <button class="btn btn-sm btn-ghost" data-act="add-opt">+ Add option</button>

@@ -15,6 +15,7 @@ const els = {
   del: document.getElementById('delete-form'),
   state: document.getElementById('save-state'),
   headTitle: document.getElementById('head-title'),
+  feedback: document.getElementById('builder-feedback'),
 };
 
 let state = window.FORM_DATA
@@ -68,6 +69,108 @@ function markDirty() {
   els.state.classList.add('is-dirty');
 }
 
+function showFeedback(kind, message, details = []) {
+  els.feedback.className = `alert alert-${kind} builder-feedback`;
+  els.feedback.replaceChildren();
+
+  const lead = document.createElement('strong');
+  lead.textContent = message;
+  els.feedback.append(lead);
+  if (details.length) {
+    const list = document.createElement('ul');
+    details.forEach((detail) => {
+      const item = document.createElement('li');
+      item.textContent = detail;
+      list.append(item);
+    });
+    els.feedback.append(list);
+  }
+  els.feedback.hidden = false;
+  els.feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function clearFeedback() {
+  els.feedback.hidden = true;
+  els.feedback.replaceChildren();
+  document.querySelectorAll('.is-invalid').forEach((el) => el.classList.remove('is-invalid'));
+}
+
+function validateForm() {
+  const errors = [];
+  const questions = state.sections.flatMap((section) => section.questions);
+  const normalizedQuestionNames = new Set();
+  const normalizedSectionNames = new Set();
+
+  if (!state.title.trim()) errors.push('Give the form a name.');
+  if (!state.confirm_msg.trim()) errors.push('Add a confirmation message.');
+  if (!state.sections.length) errors.push('Add at least one section.');
+  if (!questions.length) errors.push('Add at least one question.');
+  if (state.sections.length > 50) errors.push('A form can contain at most 50 sections.');
+  if (questions.length > 500) errors.push('A form can contain at most 500 questions.');
+
+  state.sections.forEach((section, sectionIndex) => {
+    const sectionName = section.title.trim().toLocaleLowerCase();
+    if (sectionName && normalizedSectionNames.has(sectionName)) {
+      errors.push(`Section ${sectionIndex + 1} has the same name as another section.`);
+    }
+    if (sectionName) normalizedSectionNames.add(sectionName);
+    if (!section.questions.length) {
+      errors.push(`Section ${sectionIndex + 1} needs at least one question.`);
+    }
+
+    section.questions.forEach((question, questionIndex) => {
+      const prefix = `Section ${sectionIndex + 1}, question ${questionIndex + 1}`;
+      const questionName = question.label.trim().toLocaleLowerCase();
+      if (!questionName) {
+        errors.push(`${prefix} needs a name.`);
+      } else if (normalizedQuestionNames.has(questionName)) {
+        errors.push(`“${question.label.trim()}” is used for more than one question.`);
+      }
+      if (questionName) normalizedQuestionNames.add(questionName);
+
+      if (OPTION_TYPES.includes(question.type)) {
+        const options = question.options.map((option) => option.trim()).filter(Boolean);
+        const uniqueOptions = new Set(options.map((option) => option.toLocaleLowerCase()));
+        if (options.length < 2) errors.push(`${prefix} needs at least two choices.`);
+        if (uniqueOptions.size !== options.length) {
+          errors.push(`${prefix} has a repeated choice.`);
+        }
+      }
+
+      if (SCALE_TYPES.includes(question.type)) {
+        const rawMinimum = question.config.min;
+        const rawMaximum = question.config.max;
+        const minimum = rawMinimum == null && question.type !== 'number' ? 1 : Number(rawMinimum);
+        const maximum = rawMaximum == null && question.type !== 'number' ? 5 : Number(rawMaximum);
+        const hasMinimum = rawMinimum != null || question.type !== 'number';
+        const hasMaximum = rawMaximum != null || question.type !== 'number';
+        if ((hasMinimum && !Number.isFinite(minimum)) || (hasMaximum && !Number.isFinite(maximum))) {
+          errors.push(`${prefix} needs valid minimum and maximum numbers.`);
+        } else if (hasMinimum && hasMaximum && minimum >= maximum) {
+          errors.push(`${prefix} needs a maximum greater than its minimum.`);
+        }
+      }
+    });
+  });
+  return errors;
+}
+
+function apiError(body, status) {
+  const detail = body?.detail;
+  if (typeof detail === 'string') return { message: detail, errors: [] };
+  if (detail && typeof detail === 'object') {
+    return {
+      message: detail.message || 'The form could not be saved.',
+      errors: Array.isArray(detail.errors) ? detail.errors.map((item) => item.message) : [],
+      field: detail.field,
+    };
+  }
+  if (status >= 500) {
+    return { message: 'The server is temporarily unavailable. Your changes remain on this page.', errors: [] };
+  }
+  return { message: 'The form could not be saved. Check the highlighted fields.', errors: [] };
+}
+
 function move(list, index, delta) {
   const target = index + delta;
   if (target < 0 || target >= list.length) return;
@@ -85,6 +188,7 @@ function renderOptions(wrap, question) {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = value;
+    input.maxLength = 500;
     input.placeholder = `Option ${index + 1}`;
     input.addEventListener('input', () => {
       question.options[index] = input.value;
@@ -229,6 +333,7 @@ document.querySelector(`input[name="mode"][value="${state.display_mode}"]`).chec
 els.title.addEventListener('input', () => {
   state.title = els.title.value;
   els.headTitle.textContent = state.title || 'New form';
+  els.title.classList.remove('is-invalid');
   markDirty();
 });
 els.description.addEventListener('input', () => { state.description = els.description.value; markDirty(); });
@@ -250,39 +355,76 @@ els.addSection.addEventListener('click', () => {
 });
 
 els.save.addEventListener('click', async () => {
-  if (!state.title.trim()) return alert('Give the form a title first.');
-  const empty = state.sections.flatMap((s) => s.questions).find((q) => !q.label.trim());
-  if (empty) return alert('Every question needs a label.');
+  clearFeedback();
+  const errors = validateForm();
+  if (errors.length) {
+    if (!state.title.trim()) {
+      els.title.classList.add('is-invalid');
+      els.title.focus();
+    }
+    showFeedback('error', 'Fix these problems before saving.', errors);
+    return;
+  }
 
   els.save.disabled = true;
   els.state.textContent = 'Saving…';
 
   const isNew = !window.FORM_ID;
-  const res = await fetch(isNew ? '/api/forms' : `/api/forms/${window.FORM_ID}`, {
-    method: isNew ? 'POST' : 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(state),
-  });
+  let res;
+  try {
+    res = await fetch(isNew ? '/api/forms' : `/api/forms/${window.FORM_ID}`, {
+      method: isNew ? 'POST' : 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
+  } catch (error) {
+    els.save.disabled = false;
+    els.state.textContent = 'Not saved';
+    showFeedback(
+      'error',
+      'The server could not be reached. Your changes are still here—check your connection and try again.',
+    );
+    console.error(error);
+    return;
+  }
 
   if (!res.ok) {
     els.save.disabled = false;
-    const detail = await res.json().catch(() => ({}));
-    els.state.textContent = 'Save failed';
-    alert(typeof detail.detail === 'string' ? detail.detail : 'Could not save. Check the console.');
-    console.error(detail);
+    const body = await res.json().catch(() => ({}));
+    const error = apiError(body, res.status);
+    els.state.textContent = 'Not saved';
+    if (error.field === 'title') {
+      els.title.classList.add('is-invalid');
+      els.title.focus();
+    }
+    showFeedback('error', error.message, error.errors);
+    console.error(body);
     return;
   }
 
   const data = await res.json();
   if (isNew) {
+    if (data.sheet?.status === 'error') {
+      sessionStorage.setItem('formcraft-save-notice', JSON.stringify({
+        kind: 'warn',
+        message: data.sheet.detail,
+      }));
+    } else if (data.sheet?.created) {
+      sessionStorage.setItem('formcraft-save-notice', JSON.stringify({
+        kind: 'success',
+        message: 'Form saved and its Google Sheet was created.',
+      }));
+    }
     window.location.href = `/admin/${data.id}`;
     return;
   }
   els.save.disabled = false;
   if (data.sheet?.updated) {
     els.state.textContent = 'Saved · Sheet updated';
-  } else if (data.sheet && data.sheet.detail !== 'No spreadsheet is linked.' && data.sheet.detail !== 'Google sync is off.') {
+    showFeedback('success', 'Form saved and Google Sheet updated.');
+  } else if (data.sheet?.status === 'error') {
     els.state.textContent = 'Saved · Sheet pending';
+    showFeedback('warn', data.sheet.detail);
     console.warn('Google Sheet update:', data.sheet.detail);
   } else {
     els.state.textContent = 'Saved';
@@ -298,3 +440,11 @@ els.del?.addEventListener('click', async () => {
 
 document.documentElement.style.setProperty('--accent', state.accent);
 render();
+
+try {
+  const savedNotice = JSON.parse(sessionStorage.getItem('formcraft-save-notice'));
+  if (savedNotice?.message) showFeedback(savedNotice.kind || 'success', savedNotice.message);
+  sessionStorage.removeItem('formcraft-save-notice');
+} catch (error) {
+  sessionStorage.removeItem('formcraft-save-notice');
+}
