@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import secrets
 from typing import Any
 
 import psycopg
@@ -19,7 +21,7 @@ from pydantic import ValidationError
 
 from . import auth, db, export, media, repository, sheets
 from .config import settings
-from .models import QUESTION_TYPES, FormIn, validate_answer
+from .models import QUESTION_TYPES, CatapultLeadIn, FormIn, validate_answer
 
 log = logging.getLogger("formcraft")
 
@@ -41,6 +43,7 @@ def create_app() -> FastAPI:
         name="static",
     )
     _register_public(app)
+    _register_catapult_integration(app)
     if settings.is_admin_role:
         _register_admin(app)
     return app
@@ -336,17 +339,7 @@ def _register_public(app: FastAPI) -> None:
         if errors:
             return JSONResponse({"errors": errors}, status_code=422)
 
-        response_id = repository.save_response(form["id"], answers)
-
-        if sheets.enabled() and form.get("sheet_id"):
-            try:
-                sheets.append_response(form, response_id, answers)
-            except Exception as exc:  # noqa: BLE001 - never lose a response
-                sync_error = f"{type(exc).__name__}: {exc}"
-                log.warning("sheet sync failed for %s: %s", response_id, sync_error)
-                repository.mark_synced(response_id, sync_error)
-            else:
-                repository.mark_synced(response_id)
+        _save_form_response(form, answers)
 
         return JSONResponse({"ok": True, "message": form["confirm_msg"]})
 
@@ -378,6 +371,102 @@ def _register_public(app: FastAPI) -> None:
                 "google": sheets.status_summary(),
             }
         )
+
+
+CATAPULT_FIELD_LABELS = {
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "company": "Business name",
+    "website": "Website",
+    "goal": "Main goal",
+    "budgetBand": "Budget",
+    "timeline": "Timeline",
+    "message": "Additional context",
+    "diagnostic": "Diagnostic answers",
+    "utm": "Attribution",
+    "consent": "Consent",
+    "source": "Source",
+}
+
+
+def _register_catapult_integration(app: FastAPI) -> None:
+    @app.post("/api/integrations/catapult/{kind}")
+    async def catapult_lead(kind: str, request: Request) -> JSONResponse:
+        secret = settings.catapult_ingest_secret
+        authorization = request.headers.get("authorization", "")
+        supplied = authorization.removeprefix("Bearer ").strip()
+        if not secret or not supplied or not secrets.compare_digest(secret, supplied):
+            raise HTTPException(status_code=404, detail="Not found")
+
+        form_ids = {
+            "contact": settings.catapult_contact_form_id,
+            "diagnostic": settings.catapult_diagnostic_form_id,
+        }
+        form_id = form_ids.get(kind, "")
+        if not form_id:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        try:
+            payload = CatapultLeadIn.model_validate(await request.json())
+        except (ValidationError, ValueError) as exc:
+            detail = _validation_detail(exc)
+            return JSONResponse({"message": detail}, status_code=422)
+
+        if payload.source != kind:
+            return JSONResponse(
+                {"message": "The form source does not match this submission."},
+                status_code=422,
+            )
+
+        form = repository.get_form(form_id=form_id)
+        if form is None or not form["is_published"]:
+            raise HTTPException(status_code=503, detail="Form is unavailable")
+
+        values = payload.model_dump(exclude={"websiteCheck"})
+        values["diagnostic"] = json.dumps(payload.diagnostic, sort_keys=True)
+        values["utm"] = json.dumps(payload.utm, sort_keys=True)
+        values["consent"] = "Agreed"
+        values["source"] = "Growth diagnostic" if kind == "diagnostic" else "Contact"
+        questions = {question["label"]: question for question in form["questions"]}
+        answers: dict[str, Any] = {}
+
+        for key, label in CATAPULT_FIELD_LABELS.items():
+            question = questions.get(label)
+            if question is None:
+                log.error("Catapult form %s is missing question %s", form_id, label)
+                raise HTTPException(status_code=503, detail="Form is unavailable")
+            value, error = validate_answer(question, values.get(key))
+            if error:
+                return JSONResponse({"message": error, "field": key}, status_code=422)
+            answers[question["id"]] = value
+
+        response_id = _save_form_response(form, answers)
+        return JSONResponse(
+            {"ok": True, "id": response_id, "message": form["confirm_msg"]},
+            status_code=201,
+        )
+
+
+def _validation_detail(exc: Exception) -> str:
+    if isinstance(exc, ValidationError) and exc.errors():
+        return str(exc.errors()[0].get("msg", "Check the form and try again."))
+    return "Check the form and try again."
+
+
+def _save_form_response(form: dict[str, Any], answers: dict[str, Any]) -> str:
+    """Persist first, then attempt Sheet delivery without risking the response."""
+    response_id = repository.save_response(form["id"], answers)
+    if sheets.enabled() and form.get("sheet_id"):
+        try:
+            sheets.append_response(form, response_id, answers)
+        except Exception as exc:  # noqa: BLE001 - never lose a response
+            sync_error = f"{type(exc).__name__}: {exc}"
+            log.warning("sheet sync failed for %s: %s", response_id, sync_error)
+            repository.mark_synced(response_id, sync_error)
+        else:
+            repository.mark_synced(response_id)
+    return response_id
 
 
 def _export_data(form_id: str) -> tuple[dict[str, Any], list, list]:

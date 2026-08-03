@@ -76,6 +76,50 @@ def sample_form(**overrides) -> dict:
     return payload
 
 
+def catapult_form(title="Catapult — Strategy Brief") -> dict:
+    labels = [
+        ("Name", "short_text", True),
+        ("Email", "email", False),
+        ("Phone", "short_text", False),
+        ("Business name", "short_text", False),
+        ("Website", "short_text", False),
+        ("Main goal", "long_text", True),
+        ("Budget", "short_text", False),
+        ("Timeline", "short_text", False),
+        ("Additional context", "long_text", False),
+        ("Diagnostic answers", "long_text", False),
+        ("Attribution", "long_text", False),
+        ("Consent", "checkbox", True),
+        ("Source", "short_text", True),
+    ]
+    questions = []
+    for label, qtype, required in labels:
+        question = {"type": qtype, "label": label, "required": required}
+        if label == "Consent":
+            question["options"] = ["Agreed", "Not agreed"]
+        questions.append(question)
+    return {
+        "title": title,
+        "is_published": True,
+        "sections": [{"title": "Growth enquiry", "questions": questions}],
+    }
+
+
+def catapult_lead(**overrides) -> dict:
+    payload = {
+        "name": "Test Lead",
+        "email": "lead@example.com",
+        "goal": "Improve qualified pipeline",
+        "diagnostic": {},
+        "utm": {"utm_source": "test"},
+        "consent": True,
+        "source": "contact",
+        "websiteCheck": "",
+    }
+    payload.update(overrides)
+    return payload
+
+
 # ------------------------------------------------------------------ storage
 
 
@@ -180,6 +224,69 @@ def test_duplicate_form_title_returns_clear_conflict(admin_client):
     assert duplicate.status_code == 409
     assert duplicate.json()["detail"]["code"] == "duplicate_form_name"
     assert "already exists" in duplicate.json()["detail"]["message"]
+
+
+def test_catapult_integration_requires_secret(monkeypatch):
+    from formcraft import app as app_module
+
+    form_id = repository.create_form(FormIn.model_validate(catapult_form()))
+    patch_settings(
+        monkeypatch,
+        catapult_ingest_secret="integration-secret",
+        catapult_contact_form_id=form_id,
+    )
+    client = TestClient(app_module.create_app())
+
+    assert client.post(
+        "/api/integrations/catapult/contact", json=catapult_lead()
+    ).status_code == 404
+
+
+def test_catapult_integration_persists_named_payload(monkeypatch):
+    from formcraft import app as app_module
+
+    form_id = repository.create_form(FormIn.model_validate(catapult_form()))
+    patch_settings(
+        monkeypatch,
+        catapult_ingest_secret="integration-secret",
+        catapult_contact_form_id=form_id,
+    )
+    client = TestClient(app_module.create_app())
+    response = client.post(
+        "/api/integrations/catapult/contact",
+        headers={"authorization": "Bearer integration-secret"},
+        json=catapult_lead(),
+    )
+
+    assert response.status_code == 201
+    saved = repository.list_responses(form_id)
+    questions = {
+        question["label"]: question["id"]
+        for question in repository.get_form(form_id=form_id)["questions"]
+    }
+    assert saved[0]["payload"][questions["Name"]] == "Test Lead"
+    assert saved[0]["payload"][questions["Consent"]] == ["Agreed"]
+    assert saved[0]["payload"][questions["Source"]] == "Contact"
+
+
+def test_catapult_integration_rejects_source_mismatch(monkeypatch):
+    from formcraft import app as app_module
+
+    form_id = repository.create_form(FormIn.model_validate(catapult_form()))
+    patch_settings(
+        monkeypatch,
+        catapult_ingest_secret="integration-secret",
+        catapult_contact_form_id=form_id,
+    )
+    client = TestClient(app_module.create_app())
+    response = client.post(
+        "/api/integrations/catapult/contact",
+        headers={"authorization": "Bearer integration-secret"},
+        json=catapult_lead(source="diagnostic"),
+    )
+
+    assert response.status_code == 422
+    assert repository.list_responses(form_id) == []
 
 
 def test_invalid_form_payload_returns_actionable_errors(admin_client):

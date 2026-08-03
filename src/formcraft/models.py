@@ -177,6 +177,31 @@ class FormIn(InputModel):
         return self
 
 
+class CatapultLeadIn(InputModel):
+    """Stable server-to-server contract for Catapult lead capture."""
+
+    name: str = Field(min_length=2, max_length=100)
+    email: str | None = Field(default=None, max_length=320)
+    phone: str | None = Field(default=None, min_length=7, max_length=30)
+    company: str | None = Field(default=None, max_length=120)
+    website: str | None = Field(default=None, max_length=500)
+    goal: str = Field(min_length=2, max_length=300)
+    budgetBand: str | None = Field(default=None, max_length=80)
+    timeline: str | None = Field(default=None, max_length=80)
+    message: str | None = Field(default=None, max_length=2000)
+    diagnostic: dict[str, str] = Field(default_factory=dict)
+    utm: dict[str, str] = Field(default_factory=dict)
+    consent: Literal[True]
+    source: Literal["contact", "diagnostic"]
+    websiteCheck: str = Field(default="", max_length=0)
+
+    @model_validator(mode="after")
+    def contact_method_is_present(self) -> CatapultLeadIn:
+        if not (self.email or self.phone):
+            raise ValueError("add an email address or phone number")
+        return self
+
+
 def validate_answer(question: dict[str, Any], raw: Any) -> tuple[Any, str | None]:
     """Return (normalised value, error). Error is None when the answer is valid."""
     qtype = question["type"]

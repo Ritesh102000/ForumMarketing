@@ -44,6 +44,9 @@ class Settings:
     google_client_secret_file: Path
     google_token_file: Path
     google_token_json: str
+    catapult_ingest_secret: str
+    catapult_contact_form_id: str
+    catapult_diagnostic_form_id: str
 
     @property
     def is_admin_role(self) -> bool:
@@ -96,6 +99,13 @@ def load_settings() -> Settings:
             "FORMCRAFT_GOOGLE_TOKEN_FILE", "data/google_token.json"
         ),
         google_token_json=os.getenv("FORMCRAFT_GOOGLE_TOKEN_JSON", "").strip(),
+        catapult_ingest_secret=os.getenv("FORMCRAFT_INGEST_SECRET", "").strip(),
+        catapult_contact_form_id=os.getenv(
+            "FORMCRAFT_CATAPULT_CONTACT_FORM_ID", ""
+        ).strip(),
+        catapult_diagnostic_form_id=os.getenv(
+            "FORMCRAFT_CATAPULT_DIAGNOSTIC_FORM_ID", ""
+        ).strip(),
     )
 
 
