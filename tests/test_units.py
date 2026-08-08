@@ -79,6 +79,30 @@ def test_form_rejects_bad_accent():
         FormIn.model_validate({"title": "x", "accent": "red"})
 
 
+def test_form_accepts_https_meeting_link():
+    form = FormIn.model_validate(
+        {
+            "title": "x",
+            "meeting_url": "https://calendly.com/example/intro",
+            "sections": [{"questions": [{"type": "short_text", "label": "Name"}]}],
+        }
+    )
+    assert form.meeting_url == "https://calendly.com/example/intro"
+
+
+def test_form_rejects_unsafe_meeting_link():
+    with pytest.raises(ValueError, match="complete https URL"):
+        FormIn.model_validate(
+            {
+                "title": "x",
+                "meeting_url": "javascript:alert(1)",
+                "sections": [
+                    {"questions": [{"type": "short_text", "label": "Name"}]}
+                ],
+            }
+        )
+
+
 def test_options_are_trimmed_and_blanks_dropped():
     form = FormIn.model_validate(
         {

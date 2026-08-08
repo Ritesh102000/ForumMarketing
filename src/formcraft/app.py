@@ -597,6 +597,8 @@ def _editor_payload(form: dict[str, Any]) -> dict[str, Any]:
         "accent": form["accent"],
         "is_published": form["is_published"],
         "confirm_msg": form["confirm_msg"],
+        "meeting_url": form["meeting_url"],
+        "meeting_label": form["meeting_label"],
         "sections": [
             {
                 "id": section["id"],

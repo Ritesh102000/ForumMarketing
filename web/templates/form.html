@@ -135,6 +135,9 @@
         {% if media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
         <h2 id="done-msg">{{ form.confirm_msg }}</h2>
         <p>Your response has been delivered to the form owner.</p>
+        {% if form.meeting_url %}
+        <a class="btn btn-primary btn-lg" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">{{ form.meeting_label }}</a>
+        {% endif %}
         <button class="btn btn-ghost" id="again">Submit another response</button>
       </div>
     </section>

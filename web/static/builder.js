@@ -8,6 +8,8 @@ const els = {
   description: document.getElementById('f-description'),
   accent: document.getElementById('f-accent'),
   confirm: document.getElementById('f-confirm'),
+  meetingUrl: document.getElementById('f-meeting-url'),
+  meetingLabel: document.getElementById('f-meeting-label'),
   published: document.getElementById('f-published'),
   sections: document.getElementById('sections'),
   addSection: document.getElementById('add-section'),
@@ -26,6 +28,8 @@ let state = window.FORM_DATA
       accent: window.FORM_DATA.accent,
       is_published: window.FORM_DATA.is_published,
       confirm_msg: window.FORM_DATA.confirm_msg,
+      meeting_url: window.FORM_DATA.meeting_url,
+      meeting_label: window.FORM_DATA.meeting_label,
       sections: window.FORM_DATA.sections.map((s) => ({
         id: s.id,
         title: s.title,
@@ -49,6 +53,8 @@ let state = window.FORM_DATA
       accent: '#4f46e5',
       is_published: false,
       confirm_msg: 'Thanks — your response has been recorded.',
+      meeting_url: '',
+      meeting_label: 'Book a meeting',
       sections: [{ title: '', description: '', questions: [blankQuestion()] }],
     };
 
@@ -103,6 +109,15 @@ function validateForm() {
 
   if (!state.title.trim()) errors.push('Give the form a name.');
   if (!state.confirm_msg.trim()) errors.push('Add a confirmation message.');
+  if (!state.meeting_label.trim()) errors.push('Add meeting button text.');
+  if (state.meeting_url.trim()) {
+    try {
+      const meetingUrl = new URL(state.meeting_url);
+      if (meetingUrl.protocol !== 'https:') throw new Error('not https');
+    } catch (error) {
+      errors.push('Meeting link must be a complete https URL.');
+    }
+  }
   if (!state.sections.length) errors.push('Add at least one section.');
   if (!questions.length) errors.push('Add at least one question.');
   if (state.sections.length > 50) errors.push('A form can contain at most 50 sections.');
@@ -327,6 +342,8 @@ els.title.value = state.title;
 els.description.value = state.description;
 els.accent.value = state.accent;
 els.confirm.value = state.confirm_msg;
+els.meetingUrl.value = state.meeting_url;
+els.meetingLabel.value = state.meeting_label;
 els.published.checked = state.is_published;
 document.querySelector(`input[name="mode"][value="${state.display_mode}"]`).checked = true;
 
@@ -343,6 +360,8 @@ els.accent.addEventListener('input', () => {
   markDirty();
 });
 els.confirm.addEventListener('input', () => { state.confirm_msg = els.confirm.value; markDirty(); });
+els.meetingUrl.addEventListener('input', () => { state.meeting_url = els.meetingUrl.value; markDirty(); });
+els.meetingLabel.addEventListener('input', () => { state.meeting_label = els.meetingLabel.value; markDirty(); });
 els.published.addEventListener('change', () => { state.is_published = els.published.checked; markDirty(); });
 document.querySelectorAll('input[name="mode"]').forEach((radio) => {
   radio.addEventListener('change', () => { state.display_mode = radio.value; markDirty(); });

@@ -172,8 +172,9 @@ def create_form(payload: FormIn) -> str:
             conn.execute(
                 """INSERT INTO forms
                    (id, slug, public_ref, title, description, display_mode, accent,
-                    is_published, confirm_msg, created_at, updated_at)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    is_published, confirm_msg, meeting_url, meeting_label,
+                    created_at, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (
                     form_id,
                     slug,
@@ -184,6 +185,8 @@ def create_form(payload: FormIn) -> str:
                     payload.accent,
                     payload.is_published,
                     payload.confirm_msg,
+                    payload.meeting_url,
+                    payload.meeting_label,
                     now,
                     now,
                 ),
@@ -225,7 +228,8 @@ def update_form(form_id: str, payload: FormIn) -> None:
                 """UPDATE forms
                       SET slug = %s, title = %s, description = %s,
                           display_mode = %s, accent = %s, is_published = %s,
-                          confirm_msg = %s, updated_at = %s
+                          confirm_msg = %s, meeting_url = %s,
+                          meeting_label = %s, updated_at = %s
                     WHERE id = %s""",
                 (
                     slug,
@@ -235,6 +239,8 @@ def update_form(form_id: str, payload: FormIn) -> None:
                     payload.accent,
                     payload.is_published,
                     payload.confirm_msg,
+                    payload.meeting_url,
+                    payload.meeting_label,
                     _now(),
                     form_id,
                 ),

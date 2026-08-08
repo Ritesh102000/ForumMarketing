@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -115,6 +116,8 @@ class FormIn(InputModel):
     confirm_msg: str = Field(
         default="Thanks — your response has been recorded.", max_length=1000
     )
+    meeting_url: str = Field(default="", max_length=1000)
+    meeting_label: str = Field(default="Book a meeting", max_length=100)
     sections: list[SectionIn] = Field(default_factory=list, max_length=50)
 
     @field_validator("title")
@@ -131,6 +134,25 @@ class FormIn(InputModel):
         value = value.strip()
         if not value:
             raise ValueError("confirmation message cannot be empty")
+        return value
+
+    @field_validator("meeting_url")
+    @classmethod
+    def valid_meeting_url(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc:
+            raise ValueError("meeting link must be a complete https URL")
+        return value
+
+    @field_validator("meeting_label")
+    @classmethod
+    def clean_meeting_label(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("meeting button text cannot be empty")
         return value
 
     @field_validator("accent")

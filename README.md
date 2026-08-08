@@ -86,6 +86,14 @@ uv run python scripts/run.py
 
 Open http://127.0.0.1:8480. Tables are created automatically on first start.
 
+To create the ready-made business inquiry form and connect its success screen
+to Calendly:
+
+```bash
+uv run python scripts/setup_business_inquiry_form.py \
+  --calendly-url https://calendly.com/your-name/intro-call
+```
+
 ### Try it with no database at all
 
 ```bash
@@ -119,6 +127,8 @@ both free tiers.
   If Sheets is unreachable the response is queued and retried.
 - **Question types** — short text, paragraph, email, number, date, time,
   dropdown, single choice, multiple choice, linear scale, star rating.
+- **Meeting handoff** — add a Calendly or other HTTPS booking link to any form;
+  visitors see the booking button immediately after submitting.
 
 ## Getting the data out
 

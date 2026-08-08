@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS forms (
     accent        TEXT NOT NULL DEFAULT '#6366f1',
     is_published  BOOLEAN NOT NULL DEFAULT FALSE,
     confirm_msg   TEXT NOT NULL DEFAULT 'Thanks — your response has been recorded.',
+    meeting_url   TEXT NOT NULL DEFAULT '',
+    meeting_label TEXT NOT NULL DEFAULT 'Book a meeting',
     sheet_id      TEXT,
     sheet_url     TEXT,
     sheet_error   TEXT,
@@ -79,6 +81,9 @@ CREATE TABLE IF NOT EXISTS sheet_columns (
 -- Added after the first release; ALTER ... IF NOT EXISTS keeps init_db()
 -- safe to run against an existing database.
 ALTER TABLE forms ADD COLUMN IF NOT EXISTS export_key TEXT;
+ALTER TABLE forms ADD COLUMN IF NOT EXISTS meeting_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE forms
+    ADD COLUMN IF NOT EXISTS meeting_label TEXT NOT NULL DEFAULT 'Book a meeting';
 
 -- The public URL segment. Unguessable, and generated once at creation so a
 -- shared link keeps working even after the form is renamed.
