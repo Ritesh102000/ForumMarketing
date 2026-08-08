@@ -83,7 +83,10 @@
           {% endif %}
 
           {% for q in section.questions %}
-          <div class="field" data-question="{{ q.id }}" data-type="{{ q.type }}" data-required="{{ 1 if q.required else 0 }}">
+          <div class="field" data-question="{{ q.id }}" data-type="{{ q.type }}" data-required="{{ 1 if q.required else 0 }}" data-hidden="{{ 1 if q.config.get('hidden') else 0 }}"{% if q.config.get('calendly_field') %} data-calendly-field="{{ q.config.get('calendly_field') }}"{% endif %}{% if q.config.get('hidden') %} hidden{% endif %}>
+            {% if q.config.get('hidden') %}
+              <input id="q-{{ q.id }}" name="{{ q.id }}" type="hidden">
+            {% else %}
             <label class="field-label" for="q-{{ q.id }}">
               {{ q.label }}{% if q.required %}<span class="req" aria-label="required">*</span>{% endif %}
             </label>
@@ -120,6 +123,7 @@
               </div>
             {% endif %}
             <p class="field-error" hidden></p>
+            {% endif %}
           </div>
           {% endfor %}
         </fieldset>

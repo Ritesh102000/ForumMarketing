@@ -640,7 +640,9 @@ def _sheet_after_save(form_id: str, create: bool) -> dict[str, Any]:
         }
 
 
-def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
+def _attach_sheet(
+    form_id: str, force: bool = False, include_archived: bool = True
+) -> dict[str, Any]:
     """Create the spreadsheet for a form. Never fatal — the form still works."""
     if not sheets.enabled():
         return {"created": False, "detail": "Google sync is off."}
@@ -651,7 +653,9 @@ def _attach_sheet(form_id: str, force: bool = False) -> dict[str, Any]:
     if form.get("sheet_id") and not force:
         return {"created": False, "url": form["sheet_url"], "detail": "Already linked."}
 
-    form["sheet_questions"] = repository.all_questions(form_id)
+    form["sheet_questions"] = (
+        repository.all_questions(form_id) if include_archived else form["questions"]
+    )
 
     try:
         sheet_id, sheet_url = sheets.create_spreadsheet(form)

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import argparse
 
-from formcraft import db, repository
+from formcraft import db, repository, sheets
+from formcraft.app import _attach_sheet
 from formcraft.config import settings
 from formcraft.models import FormIn
 
@@ -76,6 +77,30 @@ def _payload(existing: dict | None, calendly_url: str) -> FormIn:
             "required": True,
             "config": {"min": 0},
         },
+        {
+            "type": "short_text",
+            "label": "Calendly booking status",
+            "required": False,
+            "config": {"hidden": True, "calendly_field": "status"},
+        },
+        {
+            "type": "short_text",
+            "label": "Calendly event URI",
+            "required": False,
+            "config": {"hidden": True, "calendly_field": "event_uri"},
+        },
+        {
+            "type": "short_text",
+            "label": "Calendly invitee URI",
+            "required": False,
+            "config": {"hidden": True, "calendly_field": "invitee_uri"},
+        },
+        {
+            "type": "short_text",
+            "label": "Calendly booking completed at",
+            "required": False,
+            "config": {"hidden": True, "calendly_field": "completed_at"},
+        },
     ]
 
     questions = []
@@ -143,6 +168,14 @@ def main() -> None:
         print(f"Calendly: {form['meeting_url']}")
     else:
         print("Calendly: not set—paste the link in Form settings > Meeting link")
+
+    if form.get("sheet_id"):
+        form["sheet_questions"] = form["questions"]
+        sheets.sync_spreadsheet(form)
+        sheet = {"url": form["sheet_url"]}
+    else:
+        sheet = _attach_sheet(form_id, include_archived=False)
+    print(f"Google Sheet: {sheet.get('url') or sheet.get('detail')}")
 
 
 if __name__ == "__main__":

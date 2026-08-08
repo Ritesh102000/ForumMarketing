@@ -21,7 +21,7 @@ function buildSteps() {
   if (mode === 'single') return [];
   if (mode === 'section') return Array.from(document.querySelectorAll('[data-step]'));
   // one_by_one: every question is its own step
-  return Array.from(document.querySelectorAll('.field'));
+  return Array.from(document.querySelectorAll('.field[data-hidden="0"]'));
 }
 
 function showStep(index) {
@@ -205,6 +205,17 @@ window.addEventListener('message', (event) => {
   ) return;
 
   bookingCompleted = true;
+  const payload = event.data?.payload || {};
+  const bookingFields = {
+    status: 'Booked',
+    event_uri: payload.event?.uri || '',
+    invitee_uri: payload.invitee?.uri || '',
+    completed_at: new Date().toISOString(),
+  };
+  document.querySelectorAll('[data-calendly-field]').forEach((field) => {
+    const input = field.querySelector('input');
+    if (input) input.value = bookingFields[field.dataset.calendlyField] || '';
+  });
   const status = document.getElementById('booking-status');
   if (status) status.textContent = 'Meeting booked. Saving your business details…';
   form.requestSubmit();

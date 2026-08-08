@@ -699,6 +699,27 @@ def test_public_form_embeds_configured_calendly_link(admin_client):
     assert ">Send response<" not in page.text
 
 
+def test_public_form_hides_calendly_metadata_fields(admin_client):
+    payload = sample_form(meeting_url="https://calendly.com/arfixes/30min")
+    payload["sections"][0]["questions"].append(
+        {
+            "type": "short_text",
+            "label": "Calendly event URI",
+            "required": False,
+            "config": {"hidden": True, "calendly_field": "event_uri"},
+        }
+    )
+    form_id = admin_client.post("/api/forms", json=payload).json()["id"]
+    form = repository.get_form(form_id=form_id)
+
+    page = admin_client.get(f"/f/{form['public_ref']}")
+
+    assert page.status_code == 200
+    assert 'data-calendly-field="event_uri"' in page.text
+    assert 'type="hidden"' in page.text
+    assert '>Calendly event URI<' not in page.text
+
+
 def test_public_form_never_exposes_missing_media_placeholders(
     monkeypatch, admin_client
 ):

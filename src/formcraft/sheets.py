@@ -128,7 +128,7 @@ def create_spreadsheet(form: dict[str, Any]) -> tuple[str, str]:
                 "properties": {"title": f"{form['title']} — responses"},
                 "sheets": [{"properties": {"title": "Responses"}}],
             },
-            fields="spreadsheetId,spreadsheetUrl",
+            fields="spreadsheetId,spreadsheetUrl,sheets.properties.sheetId",
         )
         .execute()
     )
@@ -148,12 +148,17 @@ def create_spreadsheet(form: dict[str, Any]) -> tuple[str, str]:
         body={"values": [header]},
     ).execute()
 
-    _format_sheet(service, sheet_id, response_id_index)
+    worksheet_id = (
+        created.get("sheets", [{}])[0].get("properties", {}).get("sheetId", 0)
+    )
+    _format_sheet(service, sheet_id, worksheet_id, response_id_index)
     _write_columns(form["id"], mapping)
     return sheet_id, sheet_url
 
 
-def _format_sheet(service: Any, sheet_id: str, response_id_index: int) -> None:
+def _format_sheet(
+    service: Any, sheet_id: str, worksheet_id: int, response_id_index: int
+) -> None:
     # Cosmetic only — never let this block sheet creation.
     with contextlib.suppress(Exception):
         service.spreadsheets().batchUpdate(
@@ -163,7 +168,7 @@ def _format_sheet(service: Any, sheet_id: str, response_id_index: int) -> None:
                     {
                         "updateSheetProperties": {
                             "properties": {
-                                "sheetId": 0,
+                                "sheetId": worksheet_id,
                                 "gridProperties": {"frozenRowCount": 1},
                             },
                             "fields": "gridProperties.frozenRowCount",
@@ -171,7 +176,7 @@ def _format_sheet(service: Any, sheet_id: str, response_id_index: int) -> None:
                     },
                     {
                         "repeatCell": {
-                            "range": {"sheetId": 0, "endRowIndex": 1},
+                            "range": {"sheetId": worksheet_id, "endRowIndex": 1},
                             "cell": {
                                 "userEnteredFormat": {
                                     "textFormat": {"bold": True},
@@ -183,7 +188,7 @@ def _format_sheet(service: Any, sheet_id: str, response_id_index: int) -> None:
                     {
                         "updateDimensionProperties": {
                             "range": {
-                                "sheetId": 0,
+                                "sheetId": worksheet_id,
                                 "dimension": "COLUMNS",
                                 "startIndex": response_id_index,
                                 "endIndex": response_id_index + 1,
