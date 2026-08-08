@@ -694,9 +694,9 @@ def test_public_form_embeds_configured_calendly_link(admin_client):
     assert 'class="calendly-inline-widget"' in page.text
     assert f'data-url="{meeting_url}"' in page.text
     assert "https://assets.calendly.com/assets/external/widget.js" in page.text
-    assert "No separate form submission is needed." in page.text
+    assert "Booking a meeting does not submit the form." in page.text
     assert "Open Calendly separately" in page.text
-    assert ">Send response<" not in page.text
+    assert ">Submit form<" in page.text
 
 
 def test_public_form_hides_calendly_metadata_fields(admin_client):

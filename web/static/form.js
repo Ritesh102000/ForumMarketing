@@ -13,7 +13,6 @@ const hint = document.getElementById('hint');
 const mode = window.FORM_MODE;
 let steps = [];
 let current = 0;
-let bookingCompleted = false;
 let responseSaving = false;
 let responseSaved = false;
 
@@ -136,16 +135,8 @@ form.addEventListener('keydown', (event) => {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (window.HAS_BOOKING && !bookingCompleted) {
-    document.getElementById('calendly-booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return;
-  }
   if (responseSaving || responseSaved) return;
   if (!validate(fieldsIn(null))) {
-    const status = document.getElementById('booking-status');
-    if (status && bookingCompleted) {
-      status.textContent = 'Meeting booked. Complete the required fields above so we can save your business details.';
-    }
     return;
   }
 
@@ -201,10 +192,8 @@ window.addEventListener('message', (event) => {
   if (
     event.origin !== 'https://calendly.com'
     || event.data?.event !== 'calendly.event_scheduled'
-    || bookingCompleted
   ) return;
 
-  bookingCompleted = true;
   const payload = event.data?.payload || {};
   const bookingFields = {
     status: 'Booked',
@@ -217,20 +206,12 @@ window.addEventListener('message', (event) => {
     if (input) input.value = bookingFields[field.dataset.calendlyField] || '';
   });
   const status = document.getElementById('booking-status');
-  if (status) status.textContent = 'Meeting booked. Saving your business details…';
-  form.requestSubmit();
-});
-
-form.addEventListener('input', () => {
-  if (bookingCompleted && !responseSaving && !responseSaved) form.requestSubmit();
+  if (status) status.textContent = 'Meeting booked. Submit the form separately if you also want to send your business details.';
 });
 
 document.getElementById('again')?.addEventListener('click', () => {
-  if (window.HAS_BOOKING) {
-    window.location.reload();
-    return;
-  }
   form.reset();
+  responseSaved = false;
   document.querySelectorAll('.field').forEach((f) => setError(f, ''));
   form.hidden = false;
   done.hidden = true;
