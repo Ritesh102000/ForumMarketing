@@ -106,7 +106,7 @@ function validate(fields) {
 }
 
 function fieldsIn(step) {
-  if (!step) return Array.from(document.querySelectorAll('.field'));
+  if (!step) return Array.from(document.querySelectorAll('.field[data-hidden="0"]'));
   return step.classList.contains('field') ? [step] : Array.from(step.querySelectorAll('.field'));
 }
 

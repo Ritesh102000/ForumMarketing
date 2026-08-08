@@ -719,6 +719,9 @@ def test_public_form_hides_calendly_metadata_fields(admin_client):
     assert 'type="hidden"' in page.text
     assert '>Calendly event URI<' not in page.text
 
+    script = admin_client.get("/static/form.js").text
+    assert "document.querySelectorAll('.field[data-hidden=\"0\"]')" in script
+
 
 def test_public_form_never_exposes_missing_media_placeholders(
     monkeypatch, admin_client
