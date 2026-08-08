@@ -133,12 +133,13 @@
         </div>
       </form>
 
-      <div class="done" id="done" hidden>
-        {% if media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
+      <div class="done{% if form.meeting_url %} done--booking{% endif %}" id="done" hidden>
+        {% if not form.meeting_url and media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
         <h2 id="done-msg">{{ form.confirm_msg }}</h2>
         <p>Your response has been delivered to the form owner.</p>
         {% if form.meeting_url %}
-        <a class="btn btn-primary btn-lg" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">{{ form.meeting_label }}</a>
+        <div class="calendly-inline-widget" data-url="{{ form.meeting_url }}" style="min-width:320px;height:700px;"></div>
+        <a class="btn btn-ghost" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">Open Calendly separately</a>
         {% endif %}
         <button class="btn btn-ghost" id="again">Submit another response</button>
       </div>
@@ -152,6 +153,7 @@
     window.FORM_REF = {{ form.public_ref | tojson }};
     window.IS_PREVIEW = {{ preview | tojson }};
   </script>
+  {% if form.meeting_url %}<script src="https://assets.calendly.com/assets/external/widget.js" async></script>{% endif %}
   <script src="{{ static_url('form.js') }}"></script>
 </body>
 </html>

@@ -681,6 +681,22 @@ def test_public_form_is_not_indexable(admin_client):
     assert 'name="robots"' in res.text and "noindex" in res.text
 
 
+def test_public_form_embeds_configured_calendly_link(admin_client):
+    meeting_url = "https://calendly.com/arfixes/30min"
+    form_id = admin_client.post(
+        "/api/forms", json=sample_form(meeting_url=meeting_url)
+    ).json()["id"]
+    ref = repository.get_form(form_id=form_id)["public_ref"]
+
+    page = admin_client.get(f"/f/{ref}")
+
+    assert page.status_code == 200
+    assert 'class="calendly-inline-widget"' in page.text
+    assert f'data-url="{meeting_url}"' in page.text
+    assert "https://assets.calendly.com/assets/external/widget.js" in page.text
+    assert "Open Calendly separately" in page.text
+
+
 def test_public_form_never_exposes_missing_media_placeholders(
     monkeypatch, admin_client
 ):
