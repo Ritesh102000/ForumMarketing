@@ -16,6 +16,9 @@ let current = 0;
 let bookingCompleted = false;
 let responseSaving = false;
 let responseSaved = false;
+let responseId = '';
+let draftSavePromise = null;
+let autosaveTimer = null;
 
 function buildSteps() {
   if (mode === 'single') return [];
@@ -105,6 +108,21 @@ function validate(fields) {
   return ok;
 }
 
+function requiredFieldsComplete() {
+  return Array.from(document.querySelectorAll('.field[data-required="1"]')).every((field) => {
+    const value = readField(field);
+    const empty = Array.isArray(value) ? value.length === 0 : !String(value).trim();
+    if (empty) return false;
+    return field.dataset.type !== 'email' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+  });
+}
+
+function setCalendlyField(name, value) {
+  const field = document.querySelector(`[data-calendly-field="${name}"]`);
+  const input = field?.querySelector('input');
+  if (input) input.value = value;
+}
+
 function fieldsIn(step) {
   if (!step) return Array.from(document.querySelectorAll('.field'));
   return step.classList.contains('field') ? [step] : Array.from(step.querySelectorAll('.field'));
@@ -115,7 +133,35 @@ function collect() {
   document.querySelectorAll('.field').forEach((field) => {
     payload[field.dataset.question] = readField(field);
   });
+  if (responseId) payload._response_id = responseId;
   return payload;
+}
+
+async function saveBeforeBooking() {
+  if (responseSaving || !validate(fieldsIn(null))) return false;
+  if (window.IS_PREVIEW) return false;
+
+  responseSaving = true;
+  setCalendlyField('status', 'Not booked yet');
+  const status = document.getElementById('booking-status');
+  if (status) status.textContent = 'Saving your business details…';
+  try {
+    const res = await fetch(`/f/${window.FORM_REF}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collect()),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Could not save your details.');
+    responseId = data.id || '';
+    if (status) status.textContent = 'Details saved. Complete your booking in Calendly.';
+    return Boolean(responseId);
+  } catch (err) {
+    if (status) status.textContent = err.message || 'Could not save your details.';
+    return false;
+  } finally {
+    responseSaving = false;
+  }
 }
 
 nextBtn?.addEventListener('click', () => {
@@ -179,6 +225,7 @@ form.addEventListener('submit', async (event) => {
     }
     if (!res.ok) throw new Error(data.detail || 'Something went wrong.');
 
+    responseId = data.id || responseId;
     responseSaved = true;
     document.getElementById('done-msg').textContent = data.message;
     form.hidden = true;
@@ -197,12 +244,17 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
-window.addEventListener('message', (event) => {
-  if (
-    event.origin !== 'https://calendly.com'
-    || event.data?.event !== 'calendly.event_scheduled'
-    || bookingCompleted
-  ) return;
+window.addEventListener('message', async (event) => {
+  if (event.origin !== 'https://calendly.com' || bookingCompleted) return;
+
+  if (event.data?.event === 'calendly.date_and_time_selected') {
+    draftSavePromise = saveBeforeBooking();
+    await draftSavePromise;
+    return;
+  }
+
+  if (event.data?.event !== 'calendly.event_scheduled') return;
+  if (draftSavePromise) await draftSavePromise;
 
   bookingCompleted = true;
   const payload = event.data?.payload || {};
@@ -222,7 +274,16 @@ window.addEventListener('message', (event) => {
 });
 
 form.addEventListener('input', () => {
-  if (bookingCompleted && !responseSaving && !responseSaved) form.requestSubmit();
+  if (bookingCompleted && !responseSaving && !responseSaved) {
+    form.requestSubmit();
+    return;
+  }
+  window.clearTimeout(autosaveTimer);
+  if (requiredFieldsComplete()) {
+    autosaveTimer = window.setTimeout(() => {
+      draftSavePromise = saveBeforeBooking();
+    }, 700);
+  }
 });
 
 document.getElementById('again')?.addEventListener('click', () => {

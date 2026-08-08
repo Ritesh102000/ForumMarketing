@@ -389,6 +389,18 @@ def save_response(form_id: str, answers: dict[str, Any]) -> str:
     return response_id
 
 
+def update_response(response_id: str, form_id: str, answers: dict[str, Any]) -> bool:
+    """Update a capability-addressed response created by the same public form."""
+    with transaction() as conn:
+        result = conn.execute(
+            """UPDATE responses
+                  SET payload = %s, synced = FALSE, sync_error = NULL
+                WHERE id = %s AND form_id = %s""",
+            (Jsonb(answers), response_id, form_id),
+        )
+    return result.rowcount == 1
+
+
 def mark_synced(response_id: str, error: str = "") -> None:
     with transaction() as conn:
         conn.execute(

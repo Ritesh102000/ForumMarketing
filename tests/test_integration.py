@@ -699,6 +699,32 @@ def test_public_form_embeds_configured_calendly_link(admin_client):
     assert ">Send response<" not in page.text
 
 
+def test_public_form_can_update_its_prebooking_response(admin_client):
+    form_id = admin_client.post("/api/forms", json=sample_form()).json()["id"]
+    form = repository.get_form(form_id=form_id)
+    qids = [question["id"] for question in form["questions"]]
+
+    first = admin_client.post(
+        f"/f/{form['public_ref']}",
+        json={qids[0]: "First name", qids[1]: "first@example.com"},
+    )
+    response_id = first.json()["id"]
+    updated = admin_client.post(
+        f"/f/{form['public_ref']}",
+        json={
+            qids[0]: "Updated name",
+            qids[1]: "first@example.com",
+            "_response_id": response_id,
+        },
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["id"] == response_id
+    saved = repository.list_responses(form_id)
+    assert len(saved) == 1
+    assert saved[0]["payload"][qids[0]] == "Updated name"
+
+
 def test_public_form_hides_calendly_metadata_fields(admin_client):
     payload = sample_form(meeting_url="https://calendly.com/arfixes/30min")
     payload["sections"][0]["questions"].append(

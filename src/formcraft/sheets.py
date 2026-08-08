@@ -360,8 +360,14 @@ def append_response(
         .execute()
         .get("values", [])
     )
-    if any(row and row[0] == response_id for row in existing):
-        return
+    existing_row = next(
+        (
+            index + 2
+            for index, values in enumerate(existing)
+            if values and values[0] == response_id
+        ),
+        None,
+    )
 
     width = max(mapping.values(), default=0) + 1
     row: list[str] = [""] * width
@@ -374,13 +380,23 @@ def append_response(
         if index is not None and index < width:
             row[index] = _format_value(value)
 
-    service.spreadsheets().values().append(
-        spreadsheetId=form["sheet_id"],
-        range="Responses!A1",
-        valueInputOption="RAW",
-        insertDataOption="INSERT_ROWS",
-        body={"values": [row]},
-    ).execute()
+    values_api = service.spreadsheets().values()
+    if existing_row is not None:
+        end = _column_letter(width - 1)
+        values_api.update(
+            spreadsheetId=form["sheet_id"],
+            range=f"Responses!A{existing_row}:{end}{existing_row}",
+            valueInputOption="RAW",
+            body={"values": [row]},
+        ).execute()
+    else:
+        values_api.append(
+            spreadsheetId=form["sheet_id"],
+            range="Responses!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
 
 
 def status_summary() -> dict[str, Any]:

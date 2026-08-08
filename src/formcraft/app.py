@@ -339,9 +339,16 @@ def _register_public(app: FastAPI) -> None:
         if errors:
             return JSONResponse({"errors": errors}, status_code=422)
 
-        _save_form_response(form, answers)
+        requested_response_id = body.get("_response_id", "")
+        if not isinstance(requested_response_id, str):
+            requested_response_id = ""
+        response_id = _save_form_response(
+            form, answers, response_id=requested_response_id
+        )
 
-        return JSONResponse({"ok": True, "message": form["confirm_msg"]})
+        return JSONResponse(
+            {"ok": True, "id": response_id, "message": form["confirm_msg"]}
+        )
 
     @app.exception_handler(404)
     async def form_not_found(request: Request, exc: Exception) -> Response:
@@ -454,9 +461,15 @@ def _validation_detail(exc: Exception) -> str:
     return "Check the form and try again."
 
 
-def _save_form_response(form: dict[str, Any], answers: dict[str, Any]) -> str:
+def _save_form_response(
+    form: dict[str, Any], answers: dict[str, Any], response_id: str = ""
+) -> str:
     """Persist first, then attempt Sheet delivery without risking the response."""
-    response_id = repository.save_response(form["id"], answers)
+    if response_id:
+        if not repository.update_response(response_id, form["id"], answers):
+            raise HTTPException(status_code=404, detail="Response not found")
+    else:
+        response_id = repository.save_response(form["id"], answers)
     if sheets.enabled() and form.get("sheet_id"):
         try:
             sheets.append_response(form, response_id, answers)
