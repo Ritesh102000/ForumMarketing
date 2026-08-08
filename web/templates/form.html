@@ -125,22 +125,33 @@
         </fieldset>
         {% endfor %}
 
-        <div class="form-nav">
+        {% if form.meeting_url %}
+        <section class="booking-block" id="calendly-booking" aria-labelledby="booking-title">
+          <div class="booking-block__head">
+            <p class="eyebrow">Choose a time</p>
+            <h2 id="booking-title">Book your meeting</h2>
+            <p>Calendly shows the real available dates and times. Your business details are saved automatically after booking.</p>
+          </div>
+          <div class="calendly-inline-widget" data-url="{{ form.meeting_url }}" style="min-width:320px;height:700px;"></div>
+          <p class="booking-status" id="booking-status">No separate form submission is needed.</p>
+          <a class="btn btn-ghost" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">Open Calendly separately</a>
+        </section>
+        {% endif %}
+
+        <div class="form-nav{% if form.meeting_url and form.sections|length == 1 %} form-nav--booking{% endif %}">
           <button type="button" class="btn btn-ghost" id="back" hidden>Back</button>
           <button type="button" class="btn btn-primary btn-lg" id="next" hidden>Continue</button>
+          {% if not form.meeting_url %}
           <button type="submit" class="btn btn-primary btn-lg" id="submit">Send response</button>
+          {% endif %}
           <span class="hint" id="hint" hidden>Press <kbd>Enter</kbd></span>
         </div>
       </form>
 
-      <div class="done{% if form.meeting_url %} done--booking{% endif %}" id="done" hidden>
-        {% if not form.meeting_url and media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
+      <div class="done" id="done" hidden>
+        {% if media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
         <h2 id="done-msg">{{ form.confirm_msg }}</h2>
-        <p>Your response has been delivered to the form owner.</p>
-        {% if form.meeting_url %}
-        <div class="calendly-inline-widget" data-url="{{ form.meeting_url }}" style="min-width:320px;height:700px;"></div>
-        <a class="btn btn-ghost" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">Open Calendly separately</a>
-        {% endif %}
+        <p>Your response has been delivered and your meeting is booked.</p>
         <button class="btn btn-ghost" id="again">Submit another response</button>
       </div>
     </section>
@@ -152,6 +163,7 @@
     window.FORM_MODE = {{ form.display_mode | tojson }};
     window.FORM_REF = {{ form.public_ref | tojson }};
     window.IS_PREVIEW = {{ preview | tojson }};
+    window.HAS_BOOKING = {{ (form.meeting_url != '') | tojson }};
   </script>
   {% if form.meeting_url %}<script src="https://assets.calendly.com/assets/external/widget.js" async></script>{% endif %}
   <script src="{{ static_url('form.js') }}"></script>

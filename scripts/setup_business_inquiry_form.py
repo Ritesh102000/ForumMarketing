@@ -76,18 +76,6 @@ def _payload(existing: dict | None, calendly_url: str) -> FormIn:
             "required": True,
             "config": {"min": 0},
         },
-        {
-            "type": "date",
-            "label": "Preferred meeting date",
-            "help_text": "You will confirm an available slot in Calendly after submitting.",
-            "required": True,
-        },
-        {
-            "type": "time",
-            "label": "Preferred meeting time",
-            "help_text": "Choose a rough preference; Calendly will show final availability.",
-            "required": True,
-        },
     ]
 
     questions = []
@@ -99,7 +87,7 @@ def _payload(existing: dict | None, calendly_url: str) -> FormIn:
 
     section = {
         "title": "Tell us about your business",
-        "description": "Share a few details, then choose an available meeting slot.",
+        "description": "Share a few details, then book an available meeting slot below.",
         "questions": questions,
     }
     if old := old_sections.get(section["title"]):
@@ -111,12 +99,12 @@ def _payload(existing: dict | None, calendly_url: str) -> FormIn:
             "title": FORM_TITLE,
             "description": (
                 "Tell us about your business, the problem you want to solve, "
-                "your budget, and when you would like to meet."
+                "and your approximate budget, then book an available time."
             ),
             "display_mode": "section",
             "accent": "#4f46e5",
             "is_published": True,
-            "confirm_msg": "Thanks—your details are in. Now choose your meeting time.",
+            "confirm_msg": "Thanks—your details and meeting are confirmed.",
             "meeting_url": calendly_url or saved_meeting_url,
             "meeting_label": "Choose a time in Calendly",
             "sections": [section],

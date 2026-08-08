@@ -13,6 +13,9 @@ const hint = document.getElementById('hint');
 const mode = window.FORM_MODE;
 let steps = [];
 let current = 0;
+let bookingCompleted = false;
+let responseSaving = false;
+let responseSaved = false;
 
 function buildSteps() {
   if (mode === 'single') return [];
@@ -43,7 +46,7 @@ function showStep(index) {
   if (trust) trust.hidden = current > 0;
   backBtn.hidden = current === 0;
   nextBtn.hidden = current >= steps.length - 1;
-  submitBtn.hidden = current < steps.length - 1;
+  if (submitBtn) submitBtn.hidden = current < steps.length - 1;
   if (hint) hint.hidden = nextBtn.hidden;
 
   progress.style.width = `${((current + 1) / steps.length) * 100}%`;
@@ -133,15 +136,29 @@ form.addEventListener('keydown', (event) => {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!validate(fieldsIn(null))) return;
+  if (window.HAS_BOOKING && !bookingCompleted) {
+    document.getElementById('calendly-booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (responseSaving || responseSaved) return;
+  if (!validate(fieldsIn(null))) {
+    const status = document.getElementById('booking-status');
+    if (status && bookingCompleted) {
+      status.textContent = 'Meeting booked. Complete the required fields above so we can save your business details.';
+    }
+    return;
+  }
 
   if (window.IS_PREVIEW) {
     alert('This form is a draft. Publish it before collecting responses.');
     return;
   }
 
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting…';
+  responseSaving = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+  }
 
   try {
     const res = await fetch(`/f/${window.FORM_REF}`, {
@@ -162,6 +179,7 @@ form.addEventListener('submit', async (event) => {
     }
     if (!res.ok) throw new Error(data.detail || 'Something went wrong.');
 
+    responseSaved = true;
     document.getElementById('done-msg').textContent = data.message;
     form.hidden = true;
     progress.parentElement.hidden = true;
@@ -171,12 +189,36 @@ form.addEventListener('submit', async (event) => {
   } catch (err) {
     alert(err.message || 'Could not submit. Please try again.');
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Send response';
+    responseSaving = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send response';
+    }
   }
 });
 
+window.addEventListener('message', (event) => {
+  if (
+    event.origin !== 'https://calendly.com'
+    || event.data?.event !== 'calendly.event_scheduled'
+    || bookingCompleted
+  ) return;
+
+  bookingCompleted = true;
+  const status = document.getElementById('booking-status');
+  if (status) status.textContent = 'Meeting booked. Saving your business details…';
+  form.requestSubmit();
+});
+
+form.addEventListener('input', () => {
+  if (bookingCompleted && !responseSaving && !responseSaved) form.requestSubmit();
+});
+
 document.getElementById('again')?.addEventListener('click', () => {
+  if (window.HAS_BOOKING) {
+    window.location.reload();
+    return;
+  }
   form.reset();
   document.querySelectorAll('.field').forEach((f) => setError(f, ''));
   form.hidden = false;

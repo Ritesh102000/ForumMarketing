@@ -71,6 +71,7 @@ body.public { min-height: 100dvh; background: var(--bg-tint); }
 .star:hover span { transform: scale(1.1); }
 
 .form-nav { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-7); padding-top: var(--sp-5); border-top: 1px solid var(--border); }
+.form-nav--booking { display: none; }
 .form-nav .btn { min-width: 116px; }
 .form-nav .hint { margin-left: auto; color: var(--muted); font-size: var(--step--1); }
 .form-nav kbd { padding: 3px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; background: var(--surface-2); }
@@ -79,9 +80,12 @@ body.public { min-height: 100dvh; background: var(--bg-tint); }
 .done .media { width: 170px; aspect-ratio: 1; border-radius: 24px; }
 .done h2 { max-width: 18ch; font-size: var(--step-2); }
 .done p { max-width: 42ch; color: var(--muted); font-size: var(--step--1); }
-.done--booking { min-height: 0; align-content: start; padding: clamp(24px, 5vw, 42px); }
-.done--booking h2 { max-width: 28ch; }
+.booking-block { display: grid; gap: var(--sp-4); margin-top: var(--sp-7); padding-top: var(--sp-7); border-top: 1px solid var(--border); }
+.booking-block__head { display: grid; gap: 7px; text-align: left; }
+.booking-block__head h2 { font-size: var(--step-2); }
+.booking-block__head > p:last-child, .booking-status { color: var(--muted); font-size: var(--step--1); }
 .calendly-inline-widget { width: 100%; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-2); }
+.booking-status { margin: 0; text-align: center; }
 .form-footer { grid-column: 1 / -1; padding-top: var(--sp-2); color: var(--faint); font-size: .72rem; text-align: center; }
 .form-footer a { color: inherit; font-weight: 650; }
 
