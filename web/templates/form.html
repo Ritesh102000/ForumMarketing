@@ -12,6 +12,7 @@
   {% if og %}<meta property="og:image" content="{{ og }}">{% endif %}
   <meta name="twitter:card" content="summary_large_image">
   <meta name="robots" content="noindex, nofollow, noarchive">
+  <link rel="icon" href="{{ static_url('img/catapult-favicon.svg') }}" type="image/svg+xml">
 
   <link rel="stylesheet" href="{{ static_url('css/tokens.css') }}">
   <link rel="stylesheet" href="{{ static_url('css/base.css') }}">
@@ -24,10 +25,17 @@
   <div class="progress" aria-hidden="true"><div class="progress-bar" id="progress"></div></div>
 
   <header class="public-topbar">
-    <span class="public-brand">
-      <span class="public-brand__mark" aria-hidden="true">F</span>
-      <span>{{ brand_name }}</span>
-    </span>
+    <a class="public-brand" href="https://catapultaiwork.com" aria-label="Catapult main website">
+      <span class="public-brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" role="presentation">
+          <path class="public-brand__arc" d="M36 13C27 8 14 12 11 23C8 34 18 42 28 40C32 39 34 37 36 35"/>
+          <path class="public-brand__vector" d="M24 27L39 12M31 12H39V20"/>
+          <circle class="public-brand__core" cx="24" cy="27" r="3.4"/>
+          <path class="public-brand__signal" d="M12 42H20M12 45H26"/>
+        </svg>
+      </span>
+      <span>Catapult</span>
+    </a>
     <span class="public-status">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
       <span>Private response link</span>
@@ -142,7 +150,7 @@
       </div>
     </section>
 
-    <p class="form-footer">Powered by {{ brand_name }} · This form is not publicly listed</p>
+    <p class="form-footer">Powered by <a href="https://catapultaiwork.com">Catapult</a> · This form is not publicly listed</p>
   </main>
 
   <script>
