@@ -694,9 +694,12 @@ def test_public_form_embeds_configured_calendly_link(admin_client):
     assert 'class="calendly-inline-widget"' in page.text
     assert f'data-url="{meeting_url}"' in page.text
     assert "https://assets.calendly.com/assets/external/widget.js" in page.text
-    assert "Booking a meeting does not submit the form." in page.text
-    assert "Open Calendly separately" in page.text
+    assert 'id="calendly-booking"' in page.text
+    assert 'aria-labelledby="booking-title" hidden' in page.text
+    assert "Your form response is already saved." in page.text
+    assert "Open Calendly separately" not in page.text
     assert ">Submit form<" in page.text
+    assert ">Submit another response<" in page.text
 
 
 def test_public_form_hides_calendly_metadata_fields(admin_client):
@@ -721,6 +724,68 @@ def test_public_form_hides_calendly_metadata_fields(admin_client):
 
     script = admin_client.get("/static/form.js").text
     assert "document.querySelectorAll('.field[data-hidden=\"0\"]')" in script
+
+
+def test_booking_after_submission_updates_same_response_and_sheet(
+    monkeypatch, admin_client
+):
+    from formcraft import sheets
+
+    payload = sample_form(meeting_url="https://calendly.com/arfixes/30min")
+    payload["sections"][0]["questions"].extend(
+        [
+            {
+                "type": "short_text",
+                "label": "Calendly booking status",
+                "config": {"hidden": True, "calendly_field": "status"},
+            },
+            {
+                "type": "short_text",
+                "label": "Calendly event URI",
+                "config": {"hidden": True, "calendly_field": "event_uri"},
+            },
+        ]
+    )
+    form_id = admin_client.post("/api/forms", json=payload).json()["id"]
+    repository.set_sheet(form_id, "sheet-123", "https://docs.google.com/sheet-123")
+    patch_settings(monkeypatch, google_enabled=True)
+    sheet_writes: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        sheets,
+        "append_response",
+        lambda form, response_id, answers, submitted_at=None: sheet_writes.append(
+            (response_id, answers)
+        ),
+    )
+
+    form = repository.get_form(form_id=form_id)
+    submitted = admin_client.post(
+        f"/f/{form['public_ref']}",
+        json={
+            form["questions"][0]["id"]: "@direct",
+            form["questions"][1]["id"]: "direct@example.com",
+        },
+    )
+    response_id = submitted.json()["id"]
+
+    booked = admin_client.post(
+        f"/f/{form['public_ref']}/responses/{response_id}/booking",
+        json={"status": "Booked", "event_uri": "https://api.calendly.com/events/1"},
+    )
+
+    assert booked.status_code == 200
+    assert booked.json()["sheet_synced"] is True
+    responses = repository.list_responses(form_id)
+    assert len(responses) == 1
+    fields = {
+        question["config"].get("calendly_field"): question["id"]
+        for question in form["questions"]
+        if question["config"].get("calendly_field")
+    }
+    assert responses[0]["payload"][fields["status"]] == "Booked"
+    assert responses[0]["payload"][fields["event_uri"]].endswith("/events/1")
+    assert [item[0] for item in sheet_writes] == [response_id, response_id]
+    assert sheet_writes[-1][1] == responses[0]["payload"]
 
 
 def test_public_form_never_exposes_missing_media_placeholders(

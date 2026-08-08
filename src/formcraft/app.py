@@ -339,9 +339,61 @@ def _register_public(app: FastAPI) -> None:
         if errors:
             return JSONResponse({"errors": errors}, status_code=422)
 
-        _save_form_response(form, answers)
+        response_id = _save_form_response(form, answers)
 
-        return JSONResponse({"ok": True, "message": form["confirm_msg"]})
+        return JSONResponse(
+            {"ok": True, "id": response_id, "message": form["confirm_msg"]}
+        )
+
+    @app.post("/f/{public_ref}/responses/{response_id}/booking")
+    async def save_booking(
+        public_ref: str, response_id: str, request: Request
+    ) -> JSONResponse:
+        form = repository.get_form(public_ref=public_ref)
+        if form is None or not form["is_published"] or not form["meeting_url"]:
+            raise HTTPException(status_code=404, detail="Form not found")
+
+        body = await request.json()
+        booking_answers: dict[str, Any] = {}
+        for question in form["questions"]:
+            field = question["config"].get("calendly_field")
+            if not field:
+                continue
+            value, error = validate_answer(question, body.get(field))
+            if error:
+                return JSONResponse({"detail": error}, status_code=422)
+            booking_answers[question["id"]] = value
+
+        if not booking_answers or body.get("status") != "Booked":
+            return JSONResponse({"detail": "Invalid booking data."}, status_code=422)
+
+        saved = repository.update_response(form["id"], response_id, booking_answers)
+        if saved is None:
+            raise HTTPException(status_code=404, detail="Response not found")
+
+        sheet_synced = False
+        if sheets.enabled() and form.get("sheet_id"):
+            try:
+                sheets.append_response(
+                    form, response_id, saved["payload"], saved["submitted_at"]
+                )
+            except Exception as exc:  # noqa: BLE001 - booking remains durable
+                sync_error = f"{type(exc).__name__}: {exc}"
+                log.warning(
+                    "booking sheet sync failed for %s: %s", response_id, sync_error
+                )
+                repository.mark_synced(response_id, sync_error)
+            else:
+                repository.mark_synced(response_id)
+                sheet_synced = True
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "sheet_connected": bool(form.get("sheet_id")),
+                "sheet_synced": sheet_synced,
+            }
+        )
 
     @app.exception_handler(404)
     async def form_not_found(request: Request, exc: Exception) -> Response:

@@ -9,12 +9,14 @@ const submitBtn = document.getElementById('submit');
 const done = document.getElementById('done');
 const trust = document.getElementById('trust');
 const hint = document.getElementById('hint');
+const bookingBlock = document.getElementById('calendly-booking');
 
 const mode = window.FORM_MODE;
 let steps = [];
 let current = 0;
 let responseSaving = false;
 let responseSaved = false;
+let responseId = '';
 
 function buildSteps() {
   if (mode === 'single') return [];
@@ -171,11 +173,13 @@ form.addEventListener('submit', async (event) => {
     if (!res.ok) throw new Error(data.detail || 'Something went wrong.');
 
     responseSaved = true;
+    responseId = data.id || '';
     document.getElementById('done-msg').textContent = data.message;
     form.hidden = true;
     progress.parentElement.hidden = true;
     if (trust) trust.hidden = true;
     done.hidden = false;
+    if (bookingBlock) bookingBlock.hidden = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (err) {
     alert(err.message || 'Could not submit. Please try again.');
@@ -183,12 +187,12 @@ form.addEventListener('submit', async (event) => {
     responseSaving = false;
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Send response';
+      submitBtn.textContent = 'Submit form';
     }
   }
 });
 
-window.addEventListener('message', (event) => {
+window.addEventListener('message', async (event) => {
   if (
     event.origin !== 'https://calendly.com'
     || event.data?.event !== 'calendly.event_scheduled'
@@ -206,18 +210,29 @@ window.addEventListener('message', (event) => {
     if (input) input.value = bookingFields[field.dataset.calendlyField] || '';
   });
   const status = document.getElementById('booking-status');
-  if (status) status.textContent = 'Meeting booked. Submit the form separately if you also want to send your business details.';
+  if (status) status.textContent = 'Meeting booked. Linking it to your submitted response…';
+  if (!responseId) return;
+
+  try {
+    const res = await fetch(`/f/${window.FORM_REF}/responses/${responseId}/booking`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bookingFields),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Could not link booking details.');
+    if (status) {
+      status.textContent = data.sheet_connected && !data.sheet_synced
+        ? 'Meeting booked. Your details are saved and Google Sheet synchronization is pending.'
+        : 'Meeting booked. The booking details were added to your submitted response.';
+    }
+  } catch (err) {
+    if (status) status.textContent = 'Meeting booked. Your form response is safe, but the booking details could not be linked yet.';
+  }
 });
 
 document.getElementById('again')?.addEventListener('click', () => {
-  form.reset();
-  responseSaved = false;
-  document.querySelectorAll('.field').forEach((f) => setError(f, ''));
-  form.hidden = false;
-  done.hidden = true;
-  progress.parentElement.hidden = false;
-  if (trust) trust.hidden = false;
-  if (steps.length) showStep(0);
+  window.location.reload();
 });
 
 // Star ratings fill up to the hovered/selected value.

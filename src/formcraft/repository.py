@@ -389,6 +389,22 @@ def save_response(form_id: str, answers: dict[str, Any]) -> str:
     return response_id
 
 
+def update_response(
+    form_id: str, response_id: str, answers: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Merge later metadata into one response and queue its Sheet row again."""
+    with transaction() as conn:
+        return conn.execute(
+            """UPDATE responses
+                  SET payload = payload || %s,
+                      synced = FALSE,
+                      sync_error = NULL
+                WHERE id = %s AND form_id = %s
+            RETURNING *""",
+            (Jsonb(answers), response_id, form_id),
+        ).fetchone()
+
+
 def mark_synced(response_id: str, error: str = "") -> None:
     with transaction() as conn:
         conn.execute(

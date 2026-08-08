@@ -140,20 +140,24 @@
       <div class="done" id="done" hidden>
         {% if media_url("form-success") %}{{ media("form-success", slots, media_url) }}{% endif %}
         <h2 id="done-msg">{{ form.confirm_msg }}</h2>
+        {% if form.meeting_url %}
+        <p>Your response has been delivered. You can now choose a meeting time below.</p>
+        {% else %}
         <p>Your response has been delivered.</p>
         <button class="btn btn-ghost" id="again">Submit another response</button>
+        {% endif %}
       </div>
 
       {% if form.meeting_url %}
-      <section class="booking-block" id="calendly-booking" aria-labelledby="booking-title">
+      <section class="booking-block" id="calendly-booking" aria-labelledby="booking-title" hidden>
         <div class="booking-block__head">
-          <p class="eyebrow">Optional meeting</p>
+          <p class="eyebrow">Form submitted</p>
           <h2 id="booking-title">Book a meeting</h2>
-          <p>Calendly booking is separate from the form. You can book a meeting, submit the form, or do both.</p>
+          <p>Select an available time below. Your booking details will be attached to the response you just submitted.</p>
         </div>
         <div class="calendly-inline-widget" data-url="{{ form.meeting_url }}" style="min-width:320px;height:700px;"></div>
-        <p class="booking-status" id="booking-status" aria-live="polite">Booking a meeting does not submit the form.</p>
-        <a class="btn btn-ghost" href="{{ form.meeting_url }}" target="_blank" rel="noopener noreferrer">Open Calendly separately</a>
+        <p class="booking-status" id="booking-status" aria-live="polite">Your form response is already saved.</p>
+        <button class="btn btn-ghost" id="again" type="button">Submit another response</button>
       </section>
       {% endif %}
     </section>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from formcraft import sheets
 from formcraft.models import FormIn, validate_answer
 from formcraft.repository import slugify
 from formcraft.sheets import RESPONSE_ID_KEY, _column_letter
@@ -52,6 +53,74 @@ def test_column_letter():
 
 def test_response_id_mapping_key_cannot_collide_with_question_ids():
     assert RESPONSE_ID_KEY.startswith("__formcraft_")
+
+
+def test_existing_sheet_response_is_updated_in_place(monkeypatch):
+    class Request:
+        def __init__(self, result=None):
+            self.result = result or {}
+
+        def execute(self):
+            return self.result
+
+    class Values:
+        def __init__(self):
+            self.updates = []
+            self.appends = []
+
+        def get(self, **kwargs):
+            return Request({"values": [["different-id"], ["response-1"]]})
+
+        def update(self, **kwargs):
+            self.updates.append(kwargs)
+            return Request()
+
+        def append(self, **kwargs):
+            self.appends.append(kwargs)
+            return Request()
+
+    class Spreadsheets:
+        def __init__(self, values):
+            self._values = values
+
+        def values(self):
+            return self._values
+
+    class Service:
+        def __init__(self, values):
+            self._spreadsheets = Spreadsheets(values)
+
+        def spreadsheets(self):
+            return self._spreadsheets
+
+    values = Values()
+    monkeypatch.setattr(sheets, "enabled", lambda: True)
+    monkeypatch.setattr(sheets, "_load_service", lambda: Service(values))
+    monkeypatch.setattr(
+        sheets,
+        "_ensure_columns",
+        lambda service, form, questions: {
+            "question-1": 1,
+            RESPONSE_ID_KEY: 2,
+        },
+    )
+
+    sheets.append_response(
+        {
+            "id": "form-1",
+            "sheet_id": "sheet-1",
+            "questions": [{"id": "question-1"}],
+        },
+        "response-1",
+        {"question-1": "Updated"},
+        "2026-08-08T12:00:00Z",
+    )
+
+    assert values.appends == []
+    assert values.updates[0]["range"] == "Responses!A3:C3"
+    assert values.updates[0]["body"]["values"] == [
+        ["2026-08-08T12:00:00Z", "Updated", "response-1"]
+    ]
 
 
 @pytest.mark.parametrize(

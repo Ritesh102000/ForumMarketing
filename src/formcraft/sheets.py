@@ -340,7 +340,7 @@ def append_response(
     answers: dict[str, Any],
     submitted_at: Any = None,
 ) -> None:
-    """Append one response row. Raises on failure so the caller can retry."""
+    """Append or refresh one response row. Raises so the caller can retry."""
     if not enabled() or not form.get("sheet_id"):
         return
 
@@ -360,8 +360,14 @@ def append_response(
         .execute()
         .get("values", [])
     )
-    if any(row and row[0] == response_id for row in existing):
-        return
+    existing_row = next(
+        (
+            index + 2
+            for index, row in enumerate(existing)
+            if row and row[0] == response_id
+        ),
+        None,
+    )
 
     width = max(mapping.values(), default=0) + 1
     row: list[str] = [""] * width
@@ -374,13 +380,25 @@ def append_response(
         if index is not None and index < width:
             row[index] = _format_value(value)
 
-    service.spreadsheets().values().append(
-        spreadsheetId=form["sheet_id"],
-        range="Responses!A1",
-        valueInputOption="RAW",
-        insertDataOption="INSERT_ROWS",
-        body={"values": [row]},
-    ).execute()
+    values = service.spreadsheets().values()
+    if existing_row is not None:
+        values.update(
+            spreadsheetId=form["sheet_id"],
+            range=(
+                f"Responses!A{existing_row}:"
+                f"{_column_letter(width - 1)}{existing_row}"
+            ),
+            valueInputOption="RAW",
+            body={"values": [row]},
+        ).execute()
+    else:
+        values.append(
+            spreadsheetId=form["sheet_id"],
+            range="Responses!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
 
 
 def status_summary() -> dict[str, Any]:
