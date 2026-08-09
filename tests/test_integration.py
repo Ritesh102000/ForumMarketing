@@ -699,7 +699,7 @@ def test_public_form_embeds_configured_calendly_link(admin_client):
     assert "Your form response is already saved." in page.text
     assert "Open Calendly separately" not in page.text
     assert ">Submit form<" in page.text
-    assert ">Submit another response<" in page.text
+    assert 'id="again" type="button" hidden>Submit another response<' in page.text
 
 
 def test_public_form_hides_calendly_metadata_fields(admin_client):
@@ -724,6 +724,7 @@ def test_public_form_hides_calendly_metadata_fields(admin_client):
 
     script = admin_client.get("/static/form.js").text
     assert "document.querySelectorAll('.field[data-hidden=\"0\"]')" in script
+    assert "againBtn.hidden = false" in script
 
 
 def test_booking_after_submission_updates_same_response_and_sheet(

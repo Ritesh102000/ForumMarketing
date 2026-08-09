@@ -10,6 +10,7 @@ const done = document.getElementById('done');
 const trust = document.getElementById('trust');
 const hint = document.getElementById('hint');
 const bookingBlock = document.getElementById('calendly-booking');
+const againBtn = document.getElementById('again');
 
 const mode = window.FORM_MODE;
 let steps = [];
@@ -209,6 +210,7 @@ window.addEventListener('message', async (event) => {
     const input = field.querySelector('input');
     if (input) input.value = bookingFields[field.dataset.calendlyField] || '';
   });
+  if (againBtn) againBtn.hidden = false;
   const status = document.getElementById('booking-status');
   if (status) status.textContent = 'Meeting booked. Linking it to your submitted response…';
   if (!responseId) return;
@@ -231,7 +233,7 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-document.getElementById('again')?.addEventListener('click', () => {
+againBtn?.addEventListener('click', () => {
   window.location.reload();
 });
 
